@@ -1,2 +1,2 @@
 # determine_key
-Determine the key of a given audio sample.
+Determine the musical key of a given audio sample.
