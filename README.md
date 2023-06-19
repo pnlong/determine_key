@@ -33,15 +33,15 @@ On its own, audio data is hard to collect. Of the two methods mentioned previous
 
 ## Machine Learning
 
-I will use PyTorch to create two convolutional neural networks that take .MP3 files as input and each output a value, the song's relative key and whether the sample is Major or minor. The hope is that convolutional networks can better detect patterns in the audio data such as a bassline or chords that are useful in determining a song's key.
+I will use PyTorch to create two Convolutional Neural Networks (CNNs) that take .MP3 files as input and each output a value, the song's relative key and whether the sample is Major or minor. The hope is that CNNs can better detect patterns in the audio data such as a bassline or chords that are useful in determining a song's key. I face the same debate as I do for [determining tempo](https://github.com/pnlong/determine_tempo): should I use a CNN with windowing and pick the median key value, or should I use Long Short Term Memory (LSTM)? The advantage of the former is the potential for a lot of data, though the latter seems like it is more suited for this challenge (not to mention I could learn a lot from implementing LSTM or even Attention).
 
 
 ## Output
 
 As previously mentioned, the neural networks will each have a different output:
 
-1. **Relative Key (Key Signature)**. As a multilabel classification problem, the final layer of this neural network will be a SoftMax function that outputs a vector of 12 probabilities -- indicies 1 through 12 represent A Major (f# minor) through G# Major (f minor), respectively. The index with the highest probability will decide the relative key (key signature) of the audio file. For instance, if index 4 yields the highest probability, then the song is either in C Major or a minor and it is up for the second neural network to decide between the two.
-2. **Major or minor**. As a binary classification problem, the final layer of this neural network will be a single sigmoid activation function representing the probability that the file is in a Major key. A value >=0.5 suggests that the audio file is in a Major key, and a value <0.5 suggest the song is in a minor key.
+1. **Relative Key (Key Signature)**: As a multilabel classification problem, the final layer of this neural network will be a SoftMax function that outputs a vector of 12 probabilities -- indicies 1 through 12 represent A Major (f# minor) through G# Major (f minor), respectively. The index with the highest probability will decide the relative key (key signature) of the audio file. For instance, if index 4 yields the highest probability, then the song is either in C Major or a minor and it is up for the second neural network to decide between the two.
+2. **Major or minor**: As a binary classification problem, the final layer of this neural network will be a single sigmoid activation function representing the probability that the file is in a Major key. A value >=0.5 suggests that the audio file is in a Major key, while a value <0.5 suggests the song is in a minor key.
 
 
 ---
