@@ -29,28 +29,19 @@ SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 20.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 4 # in seconds, the amount of time between the start of each .wav file
 SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-validation-test fractions
-# code to determine key mappings
-# letters = list("ABCDEFG")
-# keys = ["",] * len(letters) * 4
-# for i in range(len(letters)):
-#     keys[(4 * i)]     = letters[i] +  " Maj"
-#     keys[(4 * i) + 1] = letters[i] +  " min"
-#     keys[(4 * i) + 2] = letters[i] + "# Maj"
-#     keys[(4 * i) + 3] = letters[i] + "# min"
-# ehi = (keys.index("B# Maj"), keys.index("E# Maj")) # enharmonic_keys_index
-# del keys[ehi[0]:ehi[0] + 2], keys[ehi[1]:ehi[1] + 2]
-KEY_MAPPINGS = ("A Maj", "A min",
-                "A# Maj", "A# min",
-                "B Maj", "B min",
-                "C Maj", "C min",
-                "C# Maj", "C# min",
-                "D Maj", "D min",
-                "D# Maj", "D# min",
-                "E Maj", "E min",
-                "F Maj", "F min",
-                "F# Maj", "F# min",
-                "G Maj", "G min",
-                "G# Maj", "G# min")
+KEY_MAPPINGS = ("C Maj", "A min",
+                "G Maj", "E min",
+                "D Maj", "B min",
+                "A Maj", "F# min",
+                "E Maj", "C# min",
+                "B Maj", "G# min",
+                "F# Maj", "D# min",
+                "C# Maj", "A# min",
+                "G# Maj", "F min",
+                "D# Maj", "C min",
+                "A# Maj", "G min",
+                "F Maj", "D min",
+                ) # in circle of fifths order
 ##################################################
 
 
@@ -59,7 +50,7 @@ KEY_MAPPINGS = ("A Maj", "A min",
 
 class key_dataset(Dataset):
 
-    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, use_pseudo_replicates = True):
+    def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
         # set_type can take on one of three values: ("train", "validation", "test")
 
         # import labelled data file, preprocess
@@ -75,8 +66,8 @@ class key_dataset(Dataset):
         self.data.reset_index(drop = True) # reset indicies
 
         # import constants
-        self.target_sample_rate = target_sample_rate
-        self.sample_duration = sample_duration
+        # self.target_sample_rate = target_sample_rate # not being used right now
+        # self.sample_duration = sample_duration # not being used right now
         self.device = device
 
         # import torch audio transformation(s), mel spectrogram transformation in this case
@@ -243,7 +234,7 @@ if __name__ == "__main__":
     ##################################################
 
     # instantiate key dataset
-    key_data = key_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device)
+    key_data = key_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", device = device)
 
     # test len() functionality
     print(f"There are {len(key_data)} samples in the dataset.")
