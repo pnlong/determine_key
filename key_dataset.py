@@ -1,11 +1,11 @@
 # README
 # Phillip Long
-# August 1, 2023
+# August 10, 2023
 
 # Create a custom audio dataset for PyTorch with torchaudio.
-# Uses songs from my music library
+# Uses songs from my music library.
 
-# python ./tempo_dataset.py labels_filepath output_filepath audio_dir
+# python ./key_dataset.py labels_filepath output_filepath audio_dir
 
 
 # IMPORTS
@@ -19,32 +19,56 @@ import torch
 from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
 import pandas as pd
-# sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Volumes/Seagate/artificial_dj_data/tempo_data")
+# sys.argv = ("./key_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv", "/Volumes/Seagate/artificial_dj_data/key_data")
 ##################################################
 
 
 # CONSTANTS
 ##################################################
 SAMPLE_RATE = 44100 // 2
-SAMPLE_DURATION = 10.0 # in seconds
-STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between each .wav file
+SAMPLE_DURATION = 20.0 # in seconds
+STEP_SIZE = SAMPLE_DURATION / 4 # in seconds, the amount of time between the start of each .wav file
 SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-validation-test fractions
+# code to determine key mappings
+# letters = list("ABCDEFG")
+# keys = ["",] * len(letters) * 4
+# for i in range(len(letters)):
+#     keys[(4 * i)]     = letters[i] +  " Maj"
+#     keys[(4 * i) + 1] = letters[i] +  " min"
+#     keys[(4 * i) + 2] = letters[i] + "# Maj"
+#     keys[(4 * i) + 3] = letters[i] + "# min"
+# ehi = (keys.index("B# Maj"), keys.index("E# Maj")) # enharmonic_keys_index
+# del keys[ehi[0]:ehi[0] + 2], keys[ehi[1]:ehi[1] + 2]
+KEY_MAPPINGS = ("A Maj", "A min",
+                "A# Maj", "A# min",
+                "B Maj", "B min",
+                "C Maj", "C min",
+                "C# Maj", "C# min",
+                "D Maj", "D min",
+                "D# Maj", "D# min",
+                "E Maj", "E min",
+                "F Maj", "F min",
+                "F# Maj", "F# min",
+                "G Maj", "G min",
+                "G# Maj", "G# min")
 ##################################################
 
 
-# TEMPO DATASET OBJECT CLASS
+# KEY DATASET OBJECT CLASS
 ##################################################
 
-class tempo_dataset(Dataset):
+class key_dataset(Dataset):
 
-    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, transformation):
+    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, use_pseudo_replicates = True):
         # set_type can take on one of three values: ("train", "validation", "test")
 
         # import labelled data file, preprocess
         # it is assumed that the data are mono wav files
         self.data = pd.read_csv(labels_filepath, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
         self.data = self.data[self.data["path"].apply(lambda path: exists(path))] # remove files that do not exist
-        self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
+        self.data = self.data[~pd.isna(self.data["key"])] # remove na values
+        if not use_pseudo_replicates: # if no pseudo-replicates, transform self.data once more
+            self.data = self.data.groupby(["title", "artist", "tempo", "path_origin"]).sample(n = 1).reset_index(drop = True) # randomly pick a sample from each song
 
         # partition into the train, validation, or test dataset
         self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, ignore_index = True)
@@ -55,8 +79,8 @@ class tempo_dataset(Dataset):
         self.sample_duration = sample_duration
         self.device = device
 
-        # import torch audio transformation(s)
-        self.transformation = transformation.to(self.device)
+        # import torch audio transformation(s), mel spectrogram transformation in this case
+        self.transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64).to(self.device)
 
     def __len__(self):
         return len(self.data)
@@ -75,10 +99,19 @@ class tempo_dataset(Dataset):
         # apply transformations
         signal = self.transformation(signal) # convert waveform to melspectrogram
 
-        return signal, torch.tensor([self.data.at[index, "tempo"]], dtype = torch.float) # returns the transformed signal and the actual BPM
+        return signal, torch.tensor([self.data.at[index, "key"]], dtype = torch.int32) # returns the transformed signal and the actual BPM
     
-    def get_info(self, index): # get info (title, artist, original filepath) of a file given its index; return as dictionary
-        return self.data.loc[i, ["title", "artist", "key", "path_origin", "path"]].to_dict()
+    # get info (title, artist, original filepath) of a file given its index; return as dictionary
+    def get_info(self, index):
+        return self.data.loc[index, ["title", "artist", "tempo", "path_origin", "path"]].to_dict()
+    
+    # sample n_predictions random rows from data, return a tensor of the audios and a tensor of the labels
+    def sample(self, n_predictions):
+        inputs_targets = [self.__getitem__(index = i) for i in self.data.sample(n = n_predictions, replace = False, ignore_index = False).index]
+        inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0) # key_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
+        targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1)
+        del inputs_targets
+        return inputs, targets
 
 ##################################################
 
@@ -125,6 +158,10 @@ def _trim_silence(signal, sample_rate, window_size = 0.1): # window_size = size 
     end_frame = starting_frames[len(is_silence) - is_silence[::-1].index(False) - 1] if sum(is_silence) != len(is_silence) else 0 # get ending from of audible audio
     return start_frame, end_frame
 
+# get the key class index from key name
+def get_key_index(key):
+    return KEY_MAPPINGS.index(key)
+
 ##################################################
 
 
@@ -160,11 +197,14 @@ if __name__ == "__main__":
     # load in labels
     data = pd.read_csv(LABELS_FILEPATH, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
     data = data[data["path"].apply(lambda path: exists(path))] # remove files that do not exist
-    data = data[(~pd.isna(data["tempo"])) & (data["tempo"] > 0.0)] # remove NA and unclassified tempos
+    data = data[~pd.isna(data["key"])] # remove NA and unclassified keys
     data = data.reset_index(drop = True) # reset indicies
+
+    # convert key column from key names (str) to class indicies (int)
+    data["key"] = data["key"].apply(get_key_index)
     
     # loop through songs and create .wav files
-    origin_filepaths, output_filepaths, tempos = [], [], []
+    origin_filepaths, output_filepaths, keys = [], [], []
     for i in tqdm(data.index, desc = "Chopping up songs into WAV files"): # start from start index
 
         # preprocess audio
@@ -185,16 +225,16 @@ if __name__ == "__main__":
             torchaudio.save(path, signal[:, starting_frame:(starting_frame + window_size)], sample_rate = sample_rate, format = "wav") # save chop as .wav file
             origin_filepaths.append(data.at[i, "path"]) # add original filepath to origin_filepaths
             output_filepaths.append(path) # add filepath to output_filepaths
-            tempos.append(data.at[i, "tempo"]) # add tempo to tempos
+            keys.append(data.at[i, "key"]) # add key to keys
         
     # write to OUTPUT_FILEPATH
-    data = data.rename(columns = {"path": "path_origin"}).drop(columns = ["tempo"]) # rename path column in the original dataframe
-    tempo_data = pd.DataFrame(data = {"path_origin": origin_filepaths, "path": output_filepaths, "tempo": tempos}) # create tempo_data dataframe
-    tempo_data = pd.merge(tempo_data, data, on = "path_origin", how = "left").reset_index(drop = True) # left-join tempo_data and data
-    tempo_data = tempo_data[["title", "artist", "key", "path_origin", "path", "tempo"]] # select columns
-    # most of the information in tempo_data is merely to help me locate a file if it causes problem; in an ideal world, I should be able to ignore it
+    data = data.rename(columns = {"path": "path_origin"}).drop(columns = ["key"]) # rename path column in the original dataframe
+    key_data = pd.DataFrame(data = {"path_origin": origin_filepaths, "path": output_filepaths, "key": keys}) # create key_data dataframe
+    key_data = pd.merge(key_data, data, on = "path_origin", how = "left").reset_index(drop = True) # left-join key_data and data
+    key_data = key_data[["title", "artist", "tempo", "path_origin", "path", "key"]] # select columns
+    # most of the information in key_data is merely to help me locate a file if it causes problem; in an ideal world, I should be able to ignore it
     print(f"\nWriting output to {OUTPUT_FILEPATH}.")
-    tempo_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
+    key_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
 
     ##################################################
 
@@ -202,19 +242,16 @@ if __name__ == "__main__":
     # TEST DATASET OBJECT
     ##################################################
 
-    # instantiate mel spectrogram transformation
-    mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
-
-    # instantiate tempo dataset
-    tempo_data = tempo_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device, transformation = mel_spectrogram)
+    # instantiate key dataset
+    key_data = key_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device)
 
     # test len() functionality
-    print(f"There are {len(tempo_data)} samples in the dataset.")
+    print(f"There are {len(key_data)} samples in the dataset.")
 
     # test __getitem__ functionality
-    signal, label = tempo_data[0]
+    signal, label = key_data[0]
 
     # test get_info() functionality
-    print(f"The artist of the 0th sample is {tempo_data.get_info(0)['artist']}.")
+    print(f"The artist of the 0th sample is {key_data.get_info(0)['artist']}.")
 
     ##################################################
