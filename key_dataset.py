@@ -94,7 +94,9 @@ class key_dataset(Dataset):
     
     # get info (title, artist, original filepath) of a file given its index; return as dictionary
     def get_info(self, index):
-        return self.data.loc[index, ["title", "artist", "tempo", "path_origin", "path"]].to_dict()
+        info = self.data.loc[index, ["title", "artist", "path_origin", "path", "tempo", "key"]].to_dict()
+        info["key_name"] = KEY_MAPPINGS[int(info["key"])]
+        return info
     
     # sample n_predictions random rows from data, return a tensor of the audios and a tensor of the labels
     def sample(self, n_predictions):
@@ -178,7 +180,7 @@ if __name__ == "__main__":
         makedirs(dirname(OUTPUT_FILEPATH))   
 
     # clear AUDIO_DIR
-    for filepath in glob(join(AUDIO_DIR, "*")):
+    for filepath in tqdm(glob(join(AUDIO_DIR, "*")), desc = f"Clearing files from {AUDIO_DIR}"):
         remove(filepath)
     
     # determine what device to run things on
