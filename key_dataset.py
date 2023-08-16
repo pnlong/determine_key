@@ -59,11 +59,10 @@ class key_dataset(Dataset):
         self.data = self.data[self.data["path"].apply(lambda path: exists(path))] # remove files that do not exist
         self.data = self.data[~pd.isna(self.data["key"])] # remove na values
         if not use_pseudo_replicates: # if no pseudo-replicates, transform self.data once more
-            self.data = self.data.groupby(["title", "artist", "tempo", "path_origin"]).sample(n = 1).reset_index(drop = True) # randomly pick a sample from each song
+            self.data = self.data.groupby(["title", "artist", "tempo", "path_origin"]).sample(n = 1, replace = False, random_state = 0, ignore_index = True) # randomly pick a sample from each song
 
         # partition into the train, validation, or test dataset
-        self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, ignore_index = True)
-        self.data.reset_index(drop = True) # reset indicies
+        self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, random_state = 0, ignore_index = True) # reset indicies
 
         # import constants
         # self.target_sample_rate = target_sample_rate # not being used right now
@@ -101,8 +100,8 @@ class key_dataset(Dataset):
     # sample n_predictions random rows from data, return a tensor of the audios and a tensor of the labels
     def sample(self, n_predictions):
         inputs_targets = [self.__getitem__(index = i) for i in self.data.sample(n = n_predictions, replace = False, ignore_index = False).index]
-        inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0) # key_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
-        targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1)
+        inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0).to(self.device) # key_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
+        targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1).to(self.device) # note that I register the inputs and targets tensors to whatever device we are using
         del inputs_targets
         return inputs, targets
 
