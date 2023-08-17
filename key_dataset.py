@@ -28,7 +28,7 @@ import pandas as pd
 SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 20.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 4 # in seconds, the amount of time between the start of each .wav file
-SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-validation-test fractions
+set_types = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-validation-test fractions
 KEY_MAPPINGS = ("C Maj", "A min",
                 "G Maj", "E min",
                 "D Maj", "B min",
@@ -62,8 +62,14 @@ class key_dataset(Dataset):
             self.data = self.data.groupby(["title", "artist", "tempo", "path_origin"]).sample(n = 1, replace = False, random_state = 0, ignore_index = True) # randomly pick a sample from each song
 
         # partition into the train, validation, or test dataset
-        self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, random_state = 0, ignore_index = True) # reset indicies
-
+        self.data = self.data.sample(frac = 1, replace = False, random_state = 0, ignore_index = True) # shuffle data
+        set_types[""] = range(0, len(self.data)) # convert set_types into ranges of values to extract
+        set_types["train"] = range(0, int(set_types["train"] * len(self.data)))
+        set_types["validation"] = range(set_types["train"].stop, set_types["train"].stop + int(set_types["validation"] * len(self.data)))
+        set_types["test"] = range(set_types["validation"].stop, len(self.data))
+        self.data = self.data.iloc[set_types["" if set_type not in set_types.keys() else set_type]] # extract range depending on set_type
+        self.data = self.data.reset_index(drop = True) # reset indicies also
+        
         # import constants
         # self.target_sample_rate = target_sample_rate # not being used right now
         # self.sample_duration = sample_duration # not being used right now
