@@ -30,6 +30,8 @@ from numpy import repeat
 SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 20.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 4 # in seconds, the amount of time between the start of each .wav file
+N_FFT = min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // 224) # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
+N_MELS = 128 # for waveform to melspectrogram transformation
 SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1} # train-validation-test fractions
 KEY_MAPPINGS = ("C Maj", "A min",
                 "G Maj", "E min",
@@ -106,9 +108,10 @@ class key_dataset(Dataset):
         # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = self.sample_duration) # crop/pad if signal is too long/short
 
         # convert waveform to melspectrogram
-        n_fft = min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // 224) # 224 is the minimum image width for PyTorch image processing
-        mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = n_fft, n_mels = 256).to(self.device) # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / (n_fft)) > 224
+        # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / (n_fft)) > 224
+        mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = N_FFT, n_mels = N_MELS).to(self.device)
         signal = mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 64, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
+        signal = repeat(a = signal, repeats = 256 // N_MELS, axis = 1) # make image height satisfy PyTorch image processing requirements
 
         # convert from 1 channel to 3 channels (mono -> RGB); I will treat this as an image classification problem
         signal = repeat(a = signal, repeats = 3, axis = 0) # (3 channels, # of mels, # of time samples) = (3, 64, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
@@ -183,6 +186,10 @@ def _trim_silence(signal, sample_rate, window_size = 0.1): # window_size = size 
 # get the key class index from key name
 def get_key_index(key):
     return KEY_MAPPINGS.index(key)
+
+# get the key name from the key class index
+def get_key_name(index):
+    return KEY_MAPPINGS[index]
 
 ##################################################
 
