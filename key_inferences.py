@@ -41,7 +41,7 @@ tempo_nn.load_state_dict(state_dict["state_dict"])
 print("Imported neural network parameters.")
 
 # instantiate our dataset object
-tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH, set_type = "validate", device = device)
+tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH, set_type = "test", device = device)
 
 # get a sample from the urban sound dataset for inference
 N_PREDICTIONS = int(sys.argv[3]) if len(sys.argv) == 4 else len(tempo_data)
@@ -51,12 +51,12 @@ inputs, targets = tempo_data.sample(n_predictions = N_PREDICTIONS)
 # make an inference
 print("Making predictions...")
 print("----------------------------------------------------------------")
-tempo_nn.eval()
 with torch.no_grad():
+    tempo_nn.eval()
     predictions = tempo_nn(inputs).view(N_PREDICTIONS, 1)
 
 # print results
-error = torch.abs(input = predictions - targets).numpy()
+error = torch.abs(input = predictions - targets).numpy(force = True)
 for i in range(N_PREDICTIONS):
     print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, Difference = {error[i].item():.2f}")
 print("----------------------------------------------------------------")
@@ -68,11 +68,11 @@ percentile_values = percentile(error, q = percentiles)
 print("\n".join((f"{i}% percentile: {percentile_values[i]:.2f}" for i in (5, 10, 25, 50, 75, 90, 95))))
 
 # output percentile plot
-plt.plot(percentiles, percentile_values, "-b")
+plt.plot(percentiles, percentile_values, color = "b", linestyle = "-")
 plt.xlabel("Percentile")
-plt.ylabel("Difference")
-plt.title("Validation Data Percentiles")
-plt.savefig(join(dirname(NN_FILEPATH), "percentiles.validation.png")) # save image
+plt.ylabel("Error")
+plt.title("Test Data Percentiles")
+plt.savefig(join(dirname(NN_FILEPATH), "percentiles.test.png")) # save image
 print("Outputting percentile plot...")
 
 ##################################################
