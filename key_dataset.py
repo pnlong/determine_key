@@ -20,7 +20,6 @@ from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
 import torchvision.transforms
 import pandas as pd
-from numpy import repeat
 # sys.argv = ("./key_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv", "/Volumes/Seagate/artificial_dj_data/key_data")
 ##################################################
 
@@ -111,10 +110,10 @@ class key_dataset(Dataset):
         # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / (n_fft)) > 224
         mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = N_FFT, n_mels = N_MELS).to(self.device)
         signal = mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 64, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
-        signal = repeat(a = signal, repeats = 256 // N_MELS, axis = 1) # make image height satisfy PyTorch image processing requirements
+        signal = torch.repeat_interleave(input = signal, repeats = 256 // N_MELS, dim = 1) # make image height satisfy PyTorch image processing requirements, (1, 256, 431)
 
         # convert from 1 channel to 3 channels (mono -> RGB); I will treat this as an image classification problem
-        signal = repeat(a = signal, repeats = 3, axis = 0) # (3 channels, # of mels, # of time samples) = (3, 64, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
+        signal = torch.repeat_interleave(input = signal, repeats = 3, dim = 0) # (3 channels, # of mels, # of time samples) = (3, 256, 431)
 
         # normalize the image according to PyTorch docs (https://pytorch.org/vision/0.8/models.html)
         normalize = torchvision.transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]).to(self.device)

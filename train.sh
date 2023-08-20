@@ -7,6 +7,9 @@
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
 #SBATCH --gres=gpu:V100:1               ## request 1 gpu of type V100
 
+module load cuda/11.7.1
+echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
+
 # README
 # Phillip Long
 # August 11, 2023
@@ -39,4 +42,4 @@ eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
 conda activate artificial_dj
 
 # run python script
-python "${artificial_dj}/determine_key/key_neural_network.py" "${data}/key_data.cluster.tsv" "${data}/key_nn.pth" "${epochs}"
+python "${artificial_dj}/determine_key/key_neural_network.py" "${data}/key_data.cluster.tsv" "${data}/key_nn.pretrained.pth" "${epochs}"
