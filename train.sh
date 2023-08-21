@@ -7,8 +7,7 @@
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
 #SBATCH --gres=gpu:V100:1               ## request 1 gpu of type V100
 
-module load cuda/11.7.1
-echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
+echo "JOB ID: ${SLURM_JOBID}"
 
 # README
 # Phillip Long
@@ -18,6 +17,7 @@ echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
+output_prefix="${data}/key_nn.pretrained"
 
 # command to replace filepaths in data file
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/key_data.tsv" > "${data}/key_data.cluster.tsv"
@@ -41,5 +41,8 @@ module load miniconda3/4.12.0
 eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
 conda activate artificial_dj
 
-# run python script
-python "${artificial_dj}/determine_key/key_neural_network.py" "${data}/key_data.cluster.tsv" "${data}/key_nn.pretrained.pth" "${epochs}"
+# run python training script
+python "${artificial_dj}/determine_key/key_neural_network.py" "${data}/key_data.cluster.tsv" "${output_prefix}.pth" "${epochs}"
+
+# create plots
+python "${artificial_dj}/determine_key/training_plots.py" "${output_prefix}.history.tsv" "${output_prefix}.percentiles_history.tsv" "${output_prefix}.png"

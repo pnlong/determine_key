@@ -12,7 +12,7 @@ echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
 
 # README
 # Phillip Long
-# August 4, 2023
+# August 20, 2023
 # script to test the neural network; request GPU partition
 # assumes I have already run key_dataset.py and key_neural_network.py
 
