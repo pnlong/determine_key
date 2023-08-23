@@ -31,7 +31,7 @@ SAMPLE_DURATION = 20.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 4 # in seconds, the amount of time between the start of each .wav file
 N_FFT = min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // 224) # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
 N_MELS = 128 # for waveform to melspectrogram transformation
-SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1} # train-validation-test fractions
+SET_TYPES = {"train": 0.7, "validate": 0.2, "test": 0.1} # train-validation-test fractions
 # KEY, KEY_CLASS, and KEY_QUALITY mappings in circle of fifths order
 KEY_MAPPINGS = ("C Maj", "A min",
                 "G Maj", "E min",
@@ -57,7 +57,7 @@ KEY_QUALITY_MAPPINGS = tuple(key_name.split(" ")[1] for key_name in KEY_CLASS_MA
 class key_dataset(Dataset):
 
     def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
-        # set_type can take on one of three values: ("train", "validation", "test")
+        # set_type can take on one of three values: ("train", "validate", "test")
 
         # import labelled data file, preprocess
         # it is assumed that the data are mono wav files
