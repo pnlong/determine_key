@@ -2,11 +2,11 @@
 # Phillip Long
 # August 23, 2023
 
-# Creates and trains a neural network in PyTorch.
+# Creates and trains a logistic regression neural network in PyTorch.
 # Given an audio file as input, it classifies the sample as Major or minor (see KEY_QUALITY_MAPPINGS in key_dataset.py for more)
 
-# python ./key_neural_network.py labels_filepath nn_filepath freeze_pretrained epochs
-# python /Users/philliplong/Desktop/Coding/artificial_dj/determine_key/key_neural_network.py "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pth"
+# python ./key_quality_neural_network.py labels_filepath nn_filepath freeze_pretrained epochs
+# python /Users/philliplong/Desktop/Coding/artificial_dj/determine_key/key_quality_neural_network.py "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pth"
 
 
 # IMPORTS
@@ -21,9 +21,9 @@ from torchvision.models import resnet50, ResNet50_Weights
 from torchsummary import summary
 import pandas as pd
 from numpy import percentile
-from key_dataset import key_dataset, KEY_MAPPINGS # import dataset class
-# sys.argv = ("./key_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pth")
-# sys.argv = ("./key_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/key_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pth")
+from key_dataset import key_quality_dataset, get_key_quality_index, get_key_quality_name # import dataset class
+# sys.argv = ("./key_quality_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pth")
+# sys.argv = ("./key_quality_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/key_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pth")
 ##################################################
 
 
@@ -60,9 +60,10 @@ class key_nn(torch.nn.Module):
         self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
 
         # change the final layer of the model to match my problem, change depending on the transfer learning model being used
-        self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000),
-                                            torch.nn.Linear(in_features = 1000, out_features = len(KEY_MAPPINGS)) # one feature per key
-                                            )
+        self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000), torch.nn.ReLU(),
+                                            torch.nn.Linear(in_features = 1000, out_features = 100), torch.nn.ReLU(),
+                                            torch.nn.Linear(in_features = 100, out_features = 10), torch.nn.ReLU(),
+                                            torch.nn.Linear(in_features = 10, out_features = 1), torch.nn.Sigmoid()) # one logistic regression feature
 
         # try to load previously saved parameters
         if exists(nn_filepath):
@@ -80,31 +81,10 @@ class key_nn(torch.nn.Module):
             if freeze_pretrained: # if (freeze_pretrained == True), switch all values such that the pretrained layers do not requires_grad and the output regression layer does
                 for parameter in self.model.parameters():
                     parameter.requires_grad = not (parameter.requires_grad)
-        
-        # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
-        # self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
-        # self.conv2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
-        # self.conv3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
-        # self.conv4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
-        # self.flatten = torch.nn.Flatten(start_dim = 1)
-        # self.linear1 = torch.nn.Linear(in_features = 17920, out_features = 100)
-        # self.linear2 = torch.nn.Linear(in_features = 100, out_features = 10)
-        # self.output = torch.nn.Linear(in_features = 10, out_features = 1)
 
     def forward(self, input_data):
-
         output = self.model(input_data)
         return output
-
-        # x = self.conv1(input_data)
-        # x = self.conv2(x)
-        # x = self.conv3(x)
-        # x = self.conv4(x)
-        # x = self.flatten(x)
-        # x = self.linear1(x)
-        # x = self.linear2(x)
-        # output = self.output(x)
-        # return output
 
 ##################################################
 
@@ -149,7 +129,7 @@ if __name__ == "__main__":
     print("================================================================")
 
     # instantiate loss function and optimizer
-    loss_criterion = torch.nn.MSELoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
+    loss_criterion = torch.nn.CrossEntropyLoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
     optimizer = torch.optim.Adam(key_nn.parameters()) # if I am not using a pretrained model, I need to specify lr = LEARNING_RATE
 
     # load previously trained info if applicable
@@ -160,7 +140,7 @@ if __name__ == "__main__":
         start_epoch = int(checkpoint["epoch"]) + 1    
 
     # STARTING BEST ACCURACY, ADJUST IF NEEDED
-    best_accuracy = 1e+24 # make sure to adjust for different accuracy metrics
+    best_accuracy = 0.0 # make sure to adjust for different accuracy metrics
 
     # history of losses and accuracy
     history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy", "freeze_pretrained")

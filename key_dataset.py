@@ -44,8 +44,7 @@ KEY_MAPPINGS = ("C Maj", "A min",
                 "G# Maj", "F min",
                 "D# Maj", "C min",
                 "A# Maj", "G min",
-                "F Maj", "D min",
-                )
+                "F Maj", "D min")
 KEY_CLASS_MAPPINGS = tuple(f"{KEY_MAPPINGS[i]} / {KEY_MAPPINGS[i + 1]}" for i in range(0, len(KEY_MAPPINGS), 2)) # ("C Maj / A min", ... , "F Maj / D min")
 KEY_QUALITY_MAPPINGS = tuple(key_name.split(" ")[1] for key_name in KEY_CLASS_MAPPINGS[0].split(" / ")) # (Maj, min)
 ##################################################
