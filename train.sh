@@ -22,17 +22,20 @@ output_prefix="${data}/key_nn.pretrained"
 # command to replace filepaths in data file
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/key_data.tsv" > "${data}/key_data.cluster.tsv"
 
-# set number of epochs
+# set number of epochs and freeze_pretrained
 epochs="default"
-while getopts ":e:" opt
+freeze_pretrained="default"
+while getopts e:f: opt
 do
-    case $opt in
-        e) epochs=$OPTARG;;
-       \?) echo "ERROR: Invalid option: ${0} [-e <e>]"
+    case "${opt}" in
+        e) epochs=${OPTARG};;
+        f) freeze_pretrained=${OPTARG};;
+       \?) echo "ERROR: Invalid option: ${0} [-e <epochs> -f <freeze_pretrained>]"
            exit 1;;
     esac
 done
 echo "EPOCHS: ${epochs}"
+echo "FREEZE_PRETRAINED: ${freeze_pretrained}"
 
 # module load conda (hpc3 help says not to load python + conda together)
 module load miniconda3/4.12.0
@@ -42,7 +45,7 @@ eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
 conda activate artificial_dj
 
 # run python training script
-python "${artificial_dj}/determine_key/key_neural_network.py" "${data}/key_data.cluster.tsv" "${output_prefix}.pth" "${epochs}"
+python "${artificial_dj}/determine_key/key_neural_network.py" "${data}/key_data.cluster.tsv" "${output_prefix}.pth" "${freeze_pretrained}" "${epochs}"
 
 # create plots
 python "${artificial_dj}/determine_key/training_plots.py" "${output_prefix}.history.tsv" "${output_prefix}.percentiles_history.tsv" "${output_prefix}.png"

@@ -32,6 +32,7 @@ STEP_SIZE = SAMPLE_DURATION / 4 # in seconds, the amount of time between the sta
 N_FFT = min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // 224) # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
 N_MELS = 128 # for waveform to melspectrogram transformation
 SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1} # train-validation-test fractions
+# KEY, KEY_CLASS, and KEY_QUALITY mappings in circle of fifths order
 KEY_MAPPINGS = ("C Maj", "A min",
                 "G Maj", "E min",
                 "D Maj", "B min",
@@ -44,7 +45,9 @@ KEY_MAPPINGS = ("C Maj", "A min",
                 "D# Maj", "C min",
                 "A# Maj", "G min",
                 "F Maj", "D min",
-                ) # in circle of fifths order
+                )
+KEY_CLASS_MAPPINGS = tuple(f"{KEY_MAPPINGS[i]} / {KEY_MAPPINGS[i + 1]}" for i in range(0, len(KEY_MAPPINGS), 2)) # ("C Maj / A min", ... , "F Maj / D min")
+KEY_QUALITY_MAPPINGS = tuple(key_name.split(" ")[1] for key_name in KEY_CLASS_MAPPINGS[0].split(" / ")) # (Maj, min)
 ##################################################
 
 
@@ -79,20 +82,27 @@ class key_dataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
+        # returns the transformed signal and the actual key value
+        return self._get_signal(index = index), torch.tensor([self.data.at[index, "key"]], dtype = torch.uint8)
+    
+    # get info (title, artist, original filepath) of a file given its index; return as dictionary
+    def get_info(self, index):
+        info = self.data.loc[index, ["title", "artist", "path_origin", "path", "tempo", "key", "key_class", "key_quality"]].to_dict()
+        info["key_name"] = get_key_name(index = int(info["key"]))
+        info["key_class_name"] = get_key_class_name(index = int(info["key_class"]))
+        info["key_quality_name"] = get_key_quality_name(index = int(info["key_quality"]))
+        return info
+    
+    # get the audio signal as a torch Tensor and apply transformations
+    def _get_signal(self, index):
         # get waveform data by loading in audio
         signal, sample_rate = torchaudio.load(self.data.at[index, "path"], format = "wav") # returns the waveform data and sample rate
         # register signal onto device (gpu [cuda] or cpu)
         signal = signal.to(self.device)
         # apply transformations
         signal = self._transform(signal = signal)
-        # returns the transformed signal and the actual key class value
-        return signal, torch.tensor([self.data.at[index, "key"]], dtype = torch.int32)
-    
-    # get info (title, artist, original filepath) of a file given its index; return as dictionary
-    def get_info(self, index):
-        info = self.data.loc[index, ["title", "artist", "path_origin", "path", "tempo", "key"]].to_dict()
-        info["key_name"] = KEY_MAPPINGS[int(info["key"])]
-        return info
+        # return the signal as a transformed tensor registered to the correct device
+        return signal
 
     # transform a waveform into whatever will be used to train a neural network
     def _transform(self, signal):
@@ -128,6 +138,32 @@ class key_dataset(Dataset):
     #     targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1).to(self.device) # note that I register the inputs and targets tensors to whatever device we are using
     #     del inputs_targets
     #     return inputs, targets
+
+##################################################
+
+# KEY_CLASS AND KEY_QUALITY CHILD CLASSES
+##################################################
+
+# key class (return one of 12 relative keys)
+class key_class_dataset(key_dataset):
+
+    def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
+        super().__init__(labels_filepath, set_type, device, target_sample_rate, sample_duration, use_pseudo_replicates)
+
+    def __getitem__(self, index):
+        # returns the transformed signal and the actual key class value
+        return super()._get_signal(index = index), torch.tensor([self.data.at[index, "key_class"]], dtype = torch.uint8)
+
+
+# key quality (return Maj or min)
+class key_quality_dataset(key_dataset):
+
+    def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
+        super().__init__(labels_filepath, set_type, device, target_sample_rate, sample_duration, use_pseudo_replicates)
+
+    def __getitem__(self, index):
+        # returns the transformed signal and the actual key quality value
+        return super()._get_signal(index = index), torch.tensor([self.data.at[index, "key_quality"]], dtype = torch.bool) # 0 for Major, 1 for minor
 
 ##################################################
 
@@ -182,13 +218,42 @@ def _trim_silence(signal, sample_rate, window_size = 0.1): # window_size = size 
     end_frame = starting_frames[len(is_silence) - is_silence[::-1].index(False) - 1] if sum(is_silence) != len(is_silence) else 0 # get ending from of audible audio
     return start_frame, end_frame
 
-# get the key class index from key name
-def get_key_index(key):
-    return KEY_MAPPINGS.index(key)
+##################################################
 
-# get the key name from the key class index
+
+# ACCESSOR METHODS
+##################################################
+
+# KEY
+# get the key index from key name
+def get_key_index(name):
+    return KEY_MAPPINGS.index(name)
+
+# get the key name from the key index
 def get_key_name(index):
     return KEY_MAPPINGS[index]
+
+
+# KEY CLASS
+# get the key class index from key class name
+def get_key_class_index(name):
+    key_classes = [i for i in range(len(KEY_CLASS_MAPPINGS)) if name in KEY_CLASS_MAPPINGS[i]]
+    return int(sum(key_classes))
+
+# get the key class name from the key class index
+def get_key_class_name(index):
+    return KEY_CLASS_MAPPINGS[index]
+
+
+# KEY QUALITY
+# get the key quality index from key quality name
+def get_key_quality_index(name):
+    key_quality = 0 if KEY_QUALITY_MAPPINGS[0] in name else 1
+    return key_quality
+
+# get the key quality name from the key quality index
+def get_key_quality_name(index):
+    return KEY_QUALITY_MAPPINGS[index]
 
 ##################################################
 
@@ -227,12 +292,9 @@ if __name__ == "__main__":
     data = data[data["path"].apply(lambda path: exists(path))] # remove files that do not exist
     data = data[~pd.isna(data["key"])] # remove NA and unclassified keys
     data = data.reset_index(drop = True) # reset indicies
-
-    # convert key column from key names (str) to class indicies (int)
-    data["key"] = data["key"].apply(get_key_index)
     
     # loop through songs and create .wav files
-    origin_filepaths, output_filepaths, keys = [], [], []
+    origin_filepaths, output_filepaths, keys, key_classes, key_qualities = [], [], [], [], []
     for i in tqdm(data.index, desc = "Chopping up songs into WAV files"): # start from start index
 
         # preprocess audio
@@ -248,18 +310,24 @@ if __name__ == "__main__":
         start_frame, end_frame = _trim_silence(signal = signal, sample_rate = sample_rate, window_size = 0.1) # return frames for which audible audio begins and ends
         window_size = int(SAMPLE_DURATION * sample_rate) # convert window size from seconds to frames
         starting_frames = tuple(range(start_frame, end_frame - window_size, int(STEP_SIZE * sample_rate))) # get frame numbers for which each chop starts
+        origin_filepath = data.at[i, "path"] # set original filepath
+        key_index = get_key_index(name = data.at[i, "key"]) # set key
+        key_class_index = get_key_class_index(name = data.at[i, "key"]) # set key class
+        key_quality_index = get_key_quality_index(name = data.at[i, "key"]) # set key quality
         for j, starting_frame in enumerate(starting_frames):
-            path = join(AUDIO_DIR, f"{i}_{j}.wav") # create filepath
-            torchaudio.save(path, signal[:, starting_frame:(starting_frame + window_size)], sample_rate = sample_rate, format = "wav") # save chop as .wav file
-            origin_filepaths.append(data.at[i, "path"]) # add original filepath to origin_filepaths
-            output_filepaths.append(path) # add filepath to output_filepaths
-            keys.append(data.at[i, "key"]) # add key to keys
+            output_filepath = join(AUDIO_DIR, f"{i}_{j}.wav") # create filepath
+            torchaudio.save(output_filepath, signal[:, starting_frame:(starting_frame + window_size)], sample_rate = sample_rate, format = "wav") # save chop as .wav file
+            origin_filepaths.append(origin_filepath) # add original filepath to origin_filepaths
+            output_filepaths.append(output_filepath) # add filepath to output_filepaths
+            keys.append(key_index) # add key to keys
+            key_classes.append(key_class_index) # add key class to key classes
+            key_qualities.append(key_quality_index) # add key quality to key qualities
         
     # write to OUTPUT_FILEPATH
     data = data.rename(columns = {"path": "path_origin"}).drop(columns = ["key"]) # rename path column in the original dataframe
-    key_data = pd.DataFrame(data = {"path_origin": origin_filepaths, "path": output_filepaths, "key": keys}) # create key_data dataframe
+    key_data = pd.DataFrame(data = {"path_origin": origin_filepaths, "path": output_filepaths, "key": keys, "key_class": key_classes, "key_quality": key_qualities}) # create key_data dataframe
     key_data = pd.merge(key_data, data, on = "path_origin", how = "left").reset_index(drop = True) # left-join key_data and data
-    key_data = key_data[["title", "artist", "tempo", "path_origin", "path", "key"]] # select columns
+    key_data = key_data[["title", "artist", "tempo", "path_origin", "path", "key", "key_class", "key_quality"]] # select columns
     # most of the information in key_data is merely to help me locate a file if it causes problem; in an ideal world, I should be able to ignore it
     print(f"\nWriting output to {OUTPUT_FILEPATH}.")
     key_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
@@ -283,3 +351,15 @@ if __name__ == "__main__":
     print(f"The artist of the 0th sample is {key_data.get_info(0)['artist']}.")
 
     ##################################################
+
+
+# CODE FOR ADDING KEY CLASS AND KEY QUALITY IN HINDSIGHT
+##################################################
+
+# key_data = pd.read_csv(OUTPUT_FILEPATH, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
+# key_names = key_data["key"].apply(get_key_name)
+# key_data["key_class"] = key_names.apply(get_key_class_index)
+# key_data["key_quality"] = key_names.apply(get_key_quality_index)
+# key_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
+
+##################################################
