@@ -69,7 +69,7 @@ class key_dataset(Dataset):
         
         # partition into the train, validation, or test dataset
         self.data = self.data.sample(frac = 1, replace = False, random_state = 0, ignore_index = True) # shuffle data
-        set_type = "" if set_type not in SET_TYPES.keys() else set_type
+        set_type = "" if set_type.lower()[:3] not in map(lambda key: key[:3], SET_TYPES.keys()) else str(*(key for key in SET_TYPES.keys() if key[:3] == set_type.lower()[:3])) # get the SET_TYPES key closest to set_type
         self.data = self.data.iloc[_partition(n = len(self.data))[set_type]].reset_index(drop = True) # extract range depending on set_type, also reset indicies
         
         # import constants
