@@ -29,8 +29,10 @@ import pandas as pd
 SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 20.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 4 # in seconds, the amount of time between the start of each .wav file
-N_FFT = min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // 224) # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
-N_MELS = 128 # for waveform to melspectrogram transformation
+TORCHVISION_MIN_IMAGE_DIM = 224 # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
+IMAGE_HEIGHT = 256 # height of the resulting image after transforms are applied
+N_FFT = min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // TORCHVISION_MIN_IMAGE_DIM) # number of samples in each bin on the mel spectrogram
+N_MELS = IMAGE_HEIGHT // 2 # for waveform to melspectrogram transformation
 SET_TYPES = {"train": 0.7, "validate": 0.2, "test": 0.1} # train-validation-test fractions
 # KEY, KEY_CLASS, and KEY_QUALITY mappings in circle of fifths order
 KEY_MAPPINGS = ("C Maj", "A min",
@@ -55,7 +57,7 @@ KEY_QUALITY_MAPPINGS = tuple(key_name.split(" ")[1] for key_name in KEY_CLASS_MA
 
 class key_dataset(Dataset):
 
-    def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
+    def __init__(self, labels_filepath, set_type, device, use_pseudo_replicates = True):
         # set_type can take on one of three values: ("train", "validate", "test")
 
         # import labelled data file, preprocess
@@ -73,9 +75,11 @@ class key_dataset(Dataset):
         self.data = self.data.iloc[_partition(n = len(self.data))[set_type]].reset_index(drop = True) # extract range depending on set_type, also reset indicies
         
         # import constants
-        # self.target_sample_rate = target_sample_rate # not being used right now
-        # self.sample_duration = sample_duration # not being used right now
         self.device = device
+
+        # instantiate transformation functions
+        self.mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = N_FFT, n_mels = N_MELS).to(self.device) # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / (n_fft)) > 224
+        self.normalize = torchvision.transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]).to(self.device) # normalize the image according to PyTorch docs (https://pytorch.org/vision/0.8/models.html)
 
     def __len__(self):
         return len(self.data)
@@ -99,34 +103,36 @@ class key_dataset(Dataset):
         # register signal onto device (gpu [cuda] or cpu)
         signal = signal.to(self.device)
         # apply transformations
-        signal = self._transform(signal = signal)
+        signal = self._transform(signal = signal, sample_rate = sample_rate)
         # return the signal as a transformed tensor registered to the correct device
         return signal
 
     # transform a waveform into whatever will be used to train a neural network
-    def _transform(self, signal):
+    def _transform(self, signal, sample_rate):
 
         # resample; sample_rate was already set in preprocessing
-        # signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = self.target_sample_rate, device = self.device) # resample for consistent sample rate
+        signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = SAMPLE_RATE, device = self.device) # resample for consistent sample rate
         
         # convert from stereo to mono; already done in preprocessing
-        # signal = _mix_down_if_necessary(signal = signal)
+        signal = _mix_down_if_necessary(signal = signal)
 
         # pad/crop for fixed signal duration; duration was already set in preprocessing
-        # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = self.sample_duration) # crop/pad if signal is too long/short
+        signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = SAMPLE_DURATION) # crop/pad if signal is too long/short
 
         # convert waveform to melspectrogram
-        # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / (n_fft)) > 224
-        mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = N_FFT, n_mels = N_MELS).to(self.device)
-        signal = mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 64, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
-        signal = torch.repeat_interleave(input = signal, repeats = 256 // N_MELS, dim = 1) # make image height satisfy PyTorch image processing requirements, (1, 256, 431)
+        signal = self.mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 128, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
+
+        # perform local min-max normalization such that the pixel values span from 0 to 255 (inclusive)
+        signal = (signal - torch.min(signal, dim = None).item()) * (255 / (torch.max(signal, dim = None).item() - torch.min(signal, dim = None).item()))
+
+        # make image height satisfy PyTorch image processing requirements, (1, 128, 431) -> (1, 256, 431)
+        signal = torch.repeat_interleave(input = signal, repeats = IMAGE_HEIGHT // N_MELS, dim = 1)
 
         # convert from 1 channel to 3 channels (mono -> RGB); I will treat this as an image classification problem
         signal = torch.repeat_interleave(input = signal, repeats = 3, dim = 0) # (3 channels, # of mels, # of time samples) = (3, 256, 431)
 
         # normalize the image according to PyTorch docs (https://pytorch.org/vision/0.8/models.html)
-        normalize = torchvision.transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]).to(self.device)
-        signal = normalize(signal)
+        signal = self.normalize(signal)
 
         return signal
     
@@ -352,13 +358,13 @@ if __name__ == "__main__":
     ##################################################
 
 
-# CODE FOR ADDING KEY CLASS AND KEY QUALITY IN HINDSIGHT
-##################################################
+    # CODE FOR ADDING KEY CLASS AND KEY QUALITY IN HINDSIGHT
+    ##################################################
 
-# key_data = pd.read_csv(OUTPUT_FILEPATH, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
-# key_names = key_data["key"].apply(get_key_name)
-# key_data["key_class"] = key_names.apply(get_key_class_index)
-# key_data["key_quality"] = key_names.apply(get_key_quality_index)
-# key_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
+    # key_data = pd.read_csv(OUTPUT_FILEPATH, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
+    # key_names = key_data["key"].apply(get_key_name)
+    # key_data["key_class"] = key_names.apply(get_key_class_index)
+    # key_data["key_quality"] = key_names.apply(get_key_quality_index)
+    # key_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
 
-##################################################
+    ##################################################

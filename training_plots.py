@@ -78,6 +78,7 @@ for i in range(len(freeze_pretrained_epochs) - 1):
         history_subset.at[len(history_subset) - 1, "epoch"] += 1
     elif len(history_subset) >= 2: # if more than one point, extend line with same slope
         slopes = history_subset.loc[len(history_subset) - 1].subtract(other = history_subset.loc[len(history_subset) - 2], fill_value = 0)
+        slopes = slopes.multiply(other = pd.Series(data = [1,] + ([0.5,] * (len(history_subset.columns) - 1)), index = history_subset.columns), fill_value = 1) # make slopes half of what they are (compromising between flat line and continuous slope line)
         history_subset.loc[len(history_subset)] = history_subset.loc[len(history_subset) - 1].add(other = slopes, fill_value = 0).to_list()
 
     # plot values
