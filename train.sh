@@ -24,7 +24,7 @@ output_prefix="${data}/key_nn.pretrained"
 
 # set number of epochs and freeze_pretrained
 epochs="default"
-freeze_pretrained="default"
+freeze_pretrained="True"
 while getopts e:f: opt
 do
     case "${opt}" in

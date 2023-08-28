@@ -123,7 +123,7 @@ class key_dataset(Dataset):
         signal = self.mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 128, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
 
         # perform local min-max normalization such that the pixel values span from 0 to 255 (inclusive)
-        signal = (signal - torch.min(signal, dim = None).item()) * (255 / (torch.max(signal, dim = None).item() - torch.min(signal, dim = None).item()))
+        signal = (signal - torch.min(signal, dim = None).item()) * (255 / (torch.max(signal).item() - torch.min(signal).item()))
 
         # make image height satisfy PyTorch image processing requirements, (1, 128, 431) -> (1, 256, 431)
         signal = torch.repeat_interleave(input = signal, repeats = IMAGE_HEIGHT // N_MELS, dim = 1)
@@ -238,11 +238,14 @@ def get_key_index(name):
 def get_key_name(index):
     return KEY_MAPPINGS[index]
 
+# get the key from the key class index and key quality index
+def get_key(key_class_index, key_quality_index):
+    return KEY_MAPPINGS[(2 * key_class_index) + key_quality_index]
 
 # KEY CLASS
 # get the key class index from key class name
 def get_key_class_index(name):
-    key_classes = [i for i in range(len(KEY_CLASS_MAPPINGS)) if name in KEY_CLASS_MAPPINGS[i]]
+    key_classes = [i for i in range(len(KEY_CLASS_MAPPINGS)) if name.lower() in KEY_CLASS_MAPPINGS[i].lower()]
     return int(sum(key_classes))
 
 # get the key class name from the key class index

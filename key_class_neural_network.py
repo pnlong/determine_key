@@ -6,7 +6,7 @@
 # Given an audio file as input, it classifies the sample as one of 12 relative-key classes (see KEY_CLASS_MAPPINGS in key_dataset.py for more)
 
 # python ./key_class_neural_network.py labels_filepath nn_filepath freeze_pretrained epochs
-# python /Users/philliplong/Desktop/Coding/artificial_dj/determine_key/key_class_neural_network.py "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pth"
+# python /Users/philliplong/Desktop/Coding/artificial_dj/determine_key/key_class_neural_network.py "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_class_nn.pth"
 
 
 # IMPORTS
@@ -21,26 +21,24 @@ from torchvision.models import resnet50, ResNet50_Weights
 from torchsummary import summary
 import pandas as pd
 from numpy import percentile
-from key_dataset import key_class_dataset, get_key_class_index, get_key_class_name, KEY_CLASS_MAPPINGS # import dataset class
-# sys.argv = ("./key_class_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pth")
-# sys.argv = ("./key_class_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/key_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pth")
+from key_dataset import key_class_dataset, KEY_CLASS_MAPPINGS # import dataset class
+# sys.argv = ("./key_class_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_class_nn.pth")
+# sys.argv = ("./key_class_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/key_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/key_class_nn.pth")
 ##################################################
 
 
 # CONSTANTS
 ##################################################
 BATCH_SIZE = 32
-# LEARNING_RATE = 1e-3
-# freeze pretrained parameters (true = freeze pretrained, false = unfreeze pretrained, freeze my parameters)
+LEARNING_RATE = 1e-3
+# freeze pretrained parameters (true = freeze pretrained, false = unfreeze pretrained)
 try:
-    if sys.argv[3].lower().startswith("t"):
-        FREEZE_PRETRAINED = True
-    elif sys.argv[3].lower().startswith("f"):
+    if sys.argv[3].lower().startswith("f"):
         FREEZE_PRETRAINED = False
     else:
-        FREEZE_PRETRAINED = None
+        FREEZE_PRETRAINED = True
 except (IndexError):
-    FREEZE_PRETRAINED = None
+    FREEZE_PRETRAINED = True
 # number of epochs to train
 try:
     EPOCHS = max(0, int(sys.argv[4])) # in case of a negative number
@@ -51,39 +49,60 @@ except (IndexError, ValueError): # in case there is no epochs argument or there 
 
 # NEURAL NETWORK CLASS
 ##################################################
-class key_nn(torch.nn.Module):
+USE_PRETRAINED = True
+class key_class_nn(torch.nn.Module):
 
     def __init__(self, nn_filepath, device, freeze_pretrained = None):
         super().__init__()
 
-        # initialize pretrained model from pytorch, setting pretrained to True
-        self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
+        if USE_PRETRAINED:
+            # initialize pretrained model from pytorch, setting pretrained to True
+            self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
 
-        # change the final layer of the model to match my problem, change depending on the transfer learning model being used
-        self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000), torch.nn.ReLU(),
-                                            torch.nn.Linear(in_features = 1000, out_features = 100), torch.nn.ReLU(),
-                                            torch.nn.Linear(in_features = 100, out_features = len(KEY_CLASS_MAPPINGS)), torch.nn.LogSoftmax(dim = 1)) # one feature per key class
+            # change the final layer of the model to match my problem, change depending on the transfer learning model being used
+            self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000), torch.nn.ReLU(),
+                                                torch.nn.Linear(in_features = 1000, out_features = 500), torch.nn.ReLU(),
+                                                torch.nn.Linear(in_features = 500, out_features = 100), torch.nn.ReLU(),
+                                                torch.nn.Linear(in_features = 100, out_features = len(KEY_CLASS_MAPPINGS))) # one feature per key class
 
-        # try to load previously saved parameters
-        if exists(nn_filepath):
-            checkpoint = torch.load(nn_filepath, map_location = device)
-            self.model.load_state_dict(checkpoint["state_dict"], strict = False)
+            # try to load previously saved parameters
+            if exists(nn_filepath):
+                checkpoint = torch.load(nn_filepath, map_location = device)
+                self.model.load_state_dict(checkpoint["state_dict"], strict = False)
 
-        # freeze layers according to freeze_pretrained argument, by default all layers require gradient
-        for parameter in self.model.parameters(): # unfreeze all layers
+            # freeze layers according to freeze_pretrained argument, by default all layers require gradient
+            for parameter in self.model.parameters(): # unfreeze all layers
                 parameter.requires_grad = True
-        if freeze_pretrained is not None:
-            # freeze_pretrained == False
-            for parameter in self.model.fc.parameters(): # create the distinction between my layers and the pretrained layers by freezing my layers (freeze_pretrained == False)
-                parameter.requires_grad = False
-            # freeze_pretrained == True
-            if freeze_pretrained: # if (freeze_pretrained == True), switch all values such that the pretrained layers do not requires_grad and the output regression layer does
-                for parameter in self.model.parameters():
-                    parameter.requires_grad = not (parameter.requires_grad)
+            if freeze_pretrained:
+                for parameter in self.model.parameters(): # freeze all layers
+                    parameter.requires_grad = False
+                for parameter in self.model.fc.parameters(): # unfreeze my layers
+                    parameter.requires_grad = True
+
+        else:    
+            # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear block 1 -> linear block 2 -> output
+            self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+            self.conv2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+            self.conv3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+            self.conv4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+            self.flatten = torch.nn.Flatten(start_dim = 1)
+            self.linear1 = torch.nn.Sequential(torch.nn.Linear(in_features = 17920, out_features = 1000), torch.nn.ReLU())
+            self.linear2 = torch.nn.Sequential(torch.nn.Linear(in_features = 1000, out_features = 100), torch.nn.ReLU())
+            self.logits = torch.nn.Linear(in_features = 100, out_features = len(KEY_CLASS_MAPPINGS))
 
     def forward(self, input_data):
-        output = self.model(input_data)
-        return output
+        if USE_PRETRAINED:
+            logits = self.model(input_data)
+        else:
+            x = self.conv1(input_data)
+            x = self.conv2(x)
+            x = self.conv3(x)
+            x = self.conv4(x)
+            x = self.flatten(x)
+            x = self.linear1(x)
+            x = self.linear2(x)
+            logits = self.logits(x)
+        return logits
 
 ##################################################
 
@@ -107,8 +126,8 @@ if __name__ == "__main__":
     
     # instantiate our dataset objects and data loader
     data = {
-        "train": key_dataset(labels_filepath = LABELS_FILEPATH, set_type = "train", device = device),
-        "validate": key_dataset(labels_filepath = LABELS_FILEPATH, set_type = "validate", device = device)
+        "train": key_class_dataset(labels_filepath = LABELS_FILEPATH, set_type = "train", device = device),
+        "validate": key_class_dataset(labels_filepath = LABELS_FILEPATH, set_type = "validate", device = device)
     }
     data_loader = { # shuffles the batches each epoch to reduce overfitting
         "train": DataLoader(dataset = data["train"], batch_size = BATCH_SIZE, shuffle = True),
@@ -116,7 +135,7 @@ if __name__ == "__main__":
     }
 
     # construct model and assign it to device, also summarize 
-    key_nn = key_nn(nn_filepath = NN_FILEPATH, device = device, freeze_pretrained = FREEZE_PRETRAINED).to(device)
+    key_class_nn = key_class_nn(nn_filepath = NN_FILEPATH, device = device, freeze_pretrained = FREEZE_PRETRAINED).to(device)
     if device == "cuda": # some memory usage statistics
         print(f"Device Name: {torch.cuda.get_device_name(0)}")
         print("Memory Usage:")
@@ -124,12 +143,12 @@ if __name__ == "__main__":
         print(f"  - Cached: {(torch.cuda.memory_reserved(0) / (1024 ** 3)):.1f} GB")
     print("================================================================")
     print("Summary of Neural Network:")
-    summary(model = key_nn, input_size = data["train"][0][0].shape) # input_size = (# of channels, # of mels [frequency axis], time axis)
+    summary(model = key_class_nn, input_size = data["train"][0][0].shape) # input_size = (# of channels, # of mels [frequency axis], time axis)
     print("================================================================")
 
     # instantiate loss function and optimizer
-    loss_criterion = torch.nn.NLLLoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
-    optimizer = torch.optim.Adam(key_nn.parameters()) # if I am not using a pretrained model, I need to specify lr = LEARNING_RATE
+    loss_criterion = torch.nn.CrossEntropyLoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
+    optimizer = torch.optim.Adam(key_class_nn.parameters()) if USE_PRETRAINED else torch.optim.Adam(key_class_nn.parameters(), lr = LEARNING_RATE) # if I am not using a pretrained model, I need to specify lr = LEARNING_RATE
 
     # load previously trained info if applicable
     start_epoch = 0
@@ -140,9 +159,9 @@ if __name__ == "__main__":
 
     # STARTING BEST ACCURACY, ADJUST IF NEEDED
     best_accuracy = 0.0 # make sure to adjust for different accuracy metrics
-    def compute_error(predictions, labels):
+    def compute_error(predictions, labels): # calculate closest distance at each prediction to actual note (for instance, a B is both 1 and 11 semitones away from C, pick the smaller (1 semitone))
         error = torch.abs(input = predictions.view(-1) - labels.view(-1))
-        error = torch.tensor(data = list(map(lambda difference: len(KEY_CLASS_MAPPINGS) - difference if difference > len(KEY_CLASS_MAPPINGS) // 2 else difference, error)), dtype = labels.dtype)
+        error = torch.tensor(data = list(map(lambda difference: min(difference, len(KEY_CLASS_MAPPINGS) - difference), error)), dtype = labels.dtype).view(-1) # previously lambda difference: len(KEY_CLASS_MAPPINGS) - difference if difference > len(KEY_CLASS_MAPPINGS) // 2 else difference
         return error
 
     # history of losses and accuracy
@@ -174,7 +193,7 @@ if __name__ == "__main__":
         ##################################################
 
         # set to training mode
-        key_nn.train()
+        key_class_nn.train()
 
         # instantiate some stats values
         history_epoch = dict(zip(history_columns, (0.0,) * len(history_columns))) # in the case of linear regression, accuracy is actually the average absolute error
@@ -192,7 +211,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # forward pass: compute predictions on input data using the model
-            predictions = key_nn(inputs)
+            predictions = key_class_nn(inputs)
 
             # compute loss
             loss_batch = loss_criterion(predictions, labels)
@@ -207,7 +226,9 @@ if __name__ == "__main__":
             history_epoch["train_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
             # compute the accuracy
-            accuracy_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
+            predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1)
+            labels = labels.view(-1)
+            accuracy_batch = (predictions == labels)
 
             # compute the total accuracy for the batch and add it to history_epoch["train_accuracy"]
             history_epoch["train_accuracy"] += torch.sum(input = accuracy_batch).item()
@@ -227,7 +248,7 @@ if __name__ == "__main__":
         with torch.no_grad():
             
             # set to evaluation mode
-            key_nn.eval()
+            key_class_nn.eval()
 
             # validation loop
             error_validate = torch.tensor(data = [], dtype = torch.float32).to(device)
@@ -237,7 +258,7 @@ if __name__ == "__main__":
                 inputs, labels = inputs.to(device), labels.to(device)
 
                 # forward pass: compute predictions on input data using the model
-                predictions = key_nn(inputs)
+                predictions = key_class_nn(inputs)
 
                 # compute loss
                 loss_batch = loss_criterion(predictions, labels)
@@ -246,13 +267,15 @@ if __name__ == "__main__":
                 history_epoch["validate_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
                 # compute the accuracy
-                accuracy_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
+                predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1)
+                labels = labels.view(-1)
+                accuracy_batch = (predictions == labels)
 
                 # compute the total accuracy for the batch and add it to history_epoch["validate_accuracy"]
                 history_epoch["validate_accuracy"] += torch.sum(input = accuracy_batch).item()
 
                 # add accuracy to running count of all the errors in the validation dataset
-                error_validate = torch.cat(tensors = (error_validate, accuracy_batch), dim = 0)
+                error_validate = torch.cat(tensors = (error_validate, compute_error(predictions = predictions, labels = labels).to(device)), dim = 0)
 
         ##################################################
 
@@ -274,11 +297,11 @@ if __name__ == "__main__":
 
         # save current model if its validation accuracy is the best so far
         global best_accuracy
-        if history_epoch["validate_accuracy"] <= best_accuracy:
+        if history_epoch["validate_accuracy"] >= best_accuracy:
             best_accuracy = history_epoch["validate_accuracy"] # update best_accuracy
             checkpoint = {
                 "epoch": epoch,
-                "state_dict": key_nn.state_dict(),
+                "state_dict": key_class_nn.state_dict(),
                 "optimizer": optimizer.state_dict()
             }
             torch.save(checkpoint, NN_FILEPATH)
@@ -286,7 +309,7 @@ if __name__ == "__main__":
         # print out updates
         print(f"Training Time: {(total_time_epoch / 60):.1f} minutes")
         print(f"Training Loss: {history_epoch['train_loss']:.3f}, Validation Loss: {history_epoch['validate_loss']:.3f}")
-        print(f"Mean Training Error: {history_epoch['train_accuracy']:.3f}, Mean Validation Error: {history_epoch['validate_accuracy']:.3f}")
+        print(f"Training Accuracy: {100 * history_epoch['train_accuracy']:.3f}%, Validation Accuracy: {100 * history_epoch['validate_accuracy']:.3f}%")
         print(f"Five Number Summary of Validation Errors: {' '.join((f'{value:.2f}' for value in (percentile_values[percentile] for percentile in (0, 25, 50, 75, 100))))}")
 
         ##################################################
@@ -307,16 +330,16 @@ if __name__ == "__main__":
             train_an_epoch(epoch = epoch)
         print("================================================================")
 
-    # train
-    # start by training my section of the neural network for some epochs
+    # print what section is being trained
     if FREEZE_PRETRAINED:
         print("Training final regression layer...")
-        train_epochs(start = start_epoch, n = EPOCHS)
     elif not FREEZE_PRETRAINED:
         print("Fine-tuning pretrained layers...")
-        train_epochs(start = start_epoch, n = EPOCHS)
     else:
-        sys.exit("All parameters are frozen, so the model will not be trained. Exiting program...")
+        print("Training all layers...")
+    
+    # train epochs
+    train_epochs(start = start_epoch, n = EPOCHS)
 
     ##################################################
 

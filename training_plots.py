@@ -30,6 +30,8 @@ OUTPUT_FILEPATH = sys.argv[3]
 # load in tsv files that have been generated
 history = pd.read_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
 history["epoch"] = range(history.at[0, "epoch"], history.at[0, "epoch"] + len(history)) # make sure epochs are constantly ascending
+history["train_accuracy"] = history["train_accuracy"].apply(lambda accuracy: 100 * accuracy) # multiply accuracies by 100
+history["validate_accuracy"] = history["validate_accuracy"].apply(lambda accuracy: 100 * accuracy) # multiply accuracies by 100
 percentiles_history = pd.read_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
 percentiles_history["epoch"] = [epoch for epoch in range(percentiles_history.at[0, "epoch"], percentiles_history.at[0, "epoch"] + (len(percentiles_history) // 101)) for _ in range(101)] # make sure percentiles epochs are constantly ascending
 
@@ -39,6 +41,7 @@ if freeze_pretrained_epochs[-1] == freeze_pretrained_epochs[-2]: # remove final 
     del freeze_pretrained_epochs[-1]
 freeze_pretrained_alpha = lambda freeze_pretrained: str(1 - (0.2 * int(not freeze_pretrained))) # get the color (grayscale) for the backgrounds representing freeze_pretrained
 freeze_pretrained_epochs_colors = [freeze_pretrained_alpha(freeze_pretrained = epoch[1]) for epoch in freeze_pretrained_epochs[:-1]] # get color indicies from freeze_pretrained values
+ignore_freeze_pretrained = (len(freeze_pretrained_epochs_colors) <= 1) # if freeze_pretrained doesn't change
 freeze_pretrained_epochs = [epoch[0] for epoch in freeze_pretrained_epochs] # get epoch values
 freeze_pretrained_epochs[-1] += 1 # add one to the last epoch, since it is a repeat of the second to last
 
@@ -53,20 +56,21 @@ fig, axes = plt.subplot_mosaic(mosaic = [["loss", "percentiles_history"], ["accu
 fig.suptitle("Key Neural Network")
 colors = ["tab:blue", "tab:red", "tab:orange", "tab:green", "tab:purple", "tab:brown", "tab:pink", "tab:gray", "tab:olive", "tab:cyan"]
 
-# add freeze_pretrained legend
-freeze_pretrained_edgecolor = str(0.6 * min(float(freeze_pretrained_alpha(freeze_pretrained = True)), float(freeze_pretrained_alpha(freeze_pretrained = False))))
-fig.legend(handles = (mpatches.Patch(facecolor = freeze_pretrained_alpha(freeze_pretrained = True), label = "Pretrained Layers Frozen", edgecolor = freeze_pretrained_edgecolor), mpatches.Patch(facecolor = freeze_pretrained_alpha(freeze_pretrained = False), label = "Pretrained Layers Unfrozen", edgecolor = freeze_pretrained_edgecolor)), loc = "upper left")
+if not ignore_freeze_pretrained:
+    # add freeze_pretrained legend
+    freeze_pretrained_edgecolor = str(0.6 * min(float(freeze_pretrained_alpha(freeze_pretrained = True)), float(freeze_pretrained_alpha(freeze_pretrained = False))))
+    fig.legend(handles = (mpatches.Patch(facecolor = freeze_pretrained_alpha(freeze_pretrained = True), label = "Pretrained Layers Frozen", edgecolor = freeze_pretrained_edgecolor), mpatches.Patch(facecolor = freeze_pretrained_alpha(freeze_pretrained = False), label = "Pretrained Layers Unfrozen", edgecolor = freeze_pretrained_edgecolor)), loc = "upper left")
 
-##################################################
+    ##################################################
 
 
-# PLOT LOSS AND ACCURACY
-##################################################
+    # PLOT LOSS AND ACCURACY
+    ##################################################
 
-# plot background training type
-for i in range(len(freeze_pretrained_epochs) - 1):
-    axes["loss"].axvspan(freeze_pretrained_epochs[i], freeze_pretrained_epochs[i + 1], facecolor = freeze_pretrained_epochs_colors[i])
-    axes["accuracy"].axvspan(freeze_pretrained_epochs[i], freeze_pretrained_epochs[i + 1], facecolor = freeze_pretrained_epochs_colors[i])
+    # plot background training type
+    for i in range(len(freeze_pretrained_epochs) - 1):
+        axes["loss"].axvspan(freeze_pretrained_epochs[i], freeze_pretrained_epochs[i + 1], facecolor = freeze_pretrained_epochs_colors[i])
+        axes["accuracy"].axvspan(freeze_pretrained_epochs[i], freeze_pretrained_epochs[i + 1], facecolor = freeze_pretrained_epochs_colors[i])
 
 # plot line for every training session
 for i in range(len(freeze_pretrained_epochs) - 1):
@@ -92,7 +96,7 @@ axes["loss"].sharex(other = axes["accuracy"]) # share the x-axis labels
 
 # set y-axis labels
 axes["loss"].set_ylabel("Loss")
-axes["accuracy"].set_ylabel("Accuracy")
+axes["accuracy"].set_ylabel("Accuracy (%)")
 
 # set legends
 handles_by_label_loss = dict(zip(*(axes["loss"].get_legend_handles_labels()[::-1]))) # for removing duplicate legend values
