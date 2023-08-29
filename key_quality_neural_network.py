@@ -87,11 +87,11 @@ class key_quality_nn(torch.nn.Module):
             self.flatten = torch.nn.Flatten(start_dim = 1)
             self.linear1 = torch.nn.Sequential(torch.nn.Linear(in_features = 17920, out_features = 1000), torch.nn.ReLU())
             self.linear2 = torch.nn.Sequential(torch.nn.Linear(in_features = 1000, out_features = 100), torch.nn.ReLU())
-            self.logits = torch.nn.Sequential(torch.nn.Linear(in_features = 100, out_features = 1), torch.nn.Sigmoid())
+            self.output = torch.nn.Sequential(torch.nn.Linear(in_features = 100, out_features = 1), torch.nn.Sigmoid())
 
     def forward(self, input_data):
         if USE_PRETRAINED:
-            logits = self.model(input_data)
+            output = self.model(input_data)
         else:
             x = self.conv1(input_data)
             x = self.conv2(x)
@@ -100,8 +100,8 @@ class key_quality_nn(torch.nn.Module):
             x = self.flatten(x)
             x = self.linear1(x)
             x = self.linear2(x)
-            logits = self.logits(x)
-        return logits
+            output = self.output(x)
+        return output
 
 ##################################################
 
@@ -301,20 +301,22 @@ if __name__ == "__main__":
 
     # helper function for training 
     def train_epochs(start, n): # start = epoch to start training on; n = number of epochs to train from there
+        
+        # print what section is being trained
+        if FREEZE_PRETRAINED:
+            print("Training final regression layer...")
+        elif not FREEZE_PRETRAINED:
+            print("Fine-tuning pretrained layers...")
+        else:
+            print("Training all layers...")
+
+        # epochs loop
         epochs_to_train = range(start, start + n)
         for epoch in epochs_to_train:
             print("----------------------------------------------------------------")
             print(f"EPOCH {epoch + 1} / {epochs_to_train.stop}")
             train_an_epoch(epoch = epoch)
         print("================================================================")
-
-    # print what section is being trained
-    if FREEZE_PRETRAINED:
-        print("Training final regression layer...")
-    elif not FREEZE_PRETRAINED:
-        print("Fine-tuning pretrained layers...")
-    else:
-        print("Training all layers...")
     
     # train epochs
     train_epochs(start = start_epoch, n = EPOCHS)

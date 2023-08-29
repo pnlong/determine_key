@@ -2,10 +2,10 @@
 # Phillip Long
 # August 21, 2023
 
-# Makes plots describing the training of the neural network.
+# Makes plots describing the training of the key quality neural network.
 
-# python ./training_plots.py history_filepath percentiles_history_filepath output_filepath
-# python /dfs7/adl/pnlong/artificial_dj/determine_key/training_plots.py "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pretrained.history.tsv" "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pretrained.percentiles_history.tsv" "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pretrained.png"
+# python ./training_plots_quality.py history_filepath output_filepath
+# python /dfs7/adl/pnlong/artificial_dj/determine_key/training_plots_quality.py "/dfs7/adl/pnlong/artificial_dj/data/key_quality_nn.history.tsv" "/dfs7/adl/pnlong/artificial_dj/data/key_quality_nn.png"
 
 
 # IMPORTS
@@ -14,8 +14,8 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-# sys.argv = ("./training_plots.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pretrained.history.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pretrained.percentiles_history.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_nn.pretrained.png")
-# sys.argv = ("./training_plots.py", "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pretrained.history.tsv", "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pretrained.percentiles_history.tsv", "/dfs7/adl/pnlong/artificial_dj/data/key_nn.pretrained.png")
+# sys.argv = ("./training_plots_quality.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_quality_nn.history.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/key_quality_nn.png")
+# sys.argv = ("./training_plots_quality.py", "/dfs7/adl/pnlong/artificial_dj/data/key_quality_nn.history.tsv", "/dfs7/adl/pnlong/artificial_dj/data/key_quality_nn.png")
 ##################################################
 
 
@@ -24,7 +24,6 @@ import matplotlib.patches as mpatches
 
 # make arguments
 OUTPUT_FILEPATH_HISTORY = sys.argv[1]
-OUTPUT_FILEPATH_PERCENTILES_HISTORY = sys.argv[2]
 OUTPUT_FILEPATH = sys.argv[3]
 
 # load in tsv files that have been generated
@@ -32,8 +31,6 @@ history = pd.read_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = 0, index_col
 history["epoch"] = range(history.at[0, "epoch"], history.at[0, "epoch"] + len(history)) # make sure epochs are constantly ascending
 history["train_accuracy"] = history["train_accuracy"].apply(lambda accuracy: 100 * accuracy) # multiply accuracies by 100
 history["validate_accuracy"] = history["validate_accuracy"].apply(lambda accuracy: 100 * accuracy) # multiply accuracies by 100
-percentiles_history = pd.read_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
-percentiles_history["epoch"] = [epoch for epoch in range(percentiles_history.at[0, "epoch"], percentiles_history.at[0, "epoch"] + (len(percentiles_history) // 101)) for _ in range(101)] # make sure percentiles epochs are constantly ascending
 
 # get list of epochs where training switches from pretrained layers to final regression layers
 freeze_pretrained_epochs = [(history.at[0, "epoch"], history.at[0, "freeze_pretrained"])] + [(history.at[i, "epoch"], history.at[i, "freeze_pretrained"]) for i in range(1, len(history)) if history.at[i, "freeze_pretrained"] != history.at[i - 1, "freeze_pretrained"]] + [(history.at[len(history) - 1, "epoch"], history.at[len(history) - 1, "freeze_pretrained"])]
@@ -51,10 +48,10 @@ freeze_pretrained_epochs[-1] += 1 # add one to the last epoch, since it is a rep
 # CREATE PLOT
 ##################################################
 
-# plot loss and percentiles per epoch
-fig, axes = plt.subplot_mosaic(mosaic = [["loss", "percentiles_history"], ["accuracy", "percentiles_history"]], constrained_layout = True, figsize = (12, 8))
-fig.suptitle("Key Neural Network")
-colors = ["tab:blue", "tab:red", "tab:orange", "tab:green", "tab:purple", "tab:brown", "tab:pink", "tab:gray", "tab:olive", "tab:cyan"]
+# plot loss and accuracy per epoch
+fig, axes = plt.subplot_mosaic(mosaic = [["loss"], ["accuracy"]], constrained_layout = True, figsize = (7, 8))
+fig.suptitle("Key Quality Neural Network")
+colors = ("tab:blue", "tab:red")
 
 if not ignore_freeze_pretrained:
     # add freeze_pretrained legend
@@ -86,7 +83,7 @@ for i in range(len(freeze_pretrained_epochs) - 1):
         history_subset.loc[len(history_subset)] = history_subset.loc[len(history_subset) - 1].add(other = slopes, fill_value = 0).to_list()
 
     # plot values
-    for set_type, color in zip(("train", "validate"), colors[:2]):
+    for set_type, color in zip(("train", "validate"), colors):
         axes["loss"].plot(history_subset["epoch"], history_subset[set_type + "_loss"], color = color, linestyle = "solid", label = set_type.title())
         axes["accuracy"].plot(history_subset["epoch"], history_subset[set_type + "_accuracy"], color = color, linestyle = "dashed", label = set_type.title())
 
@@ -107,36 +104,6 @@ axes["accuracy"].legend(handles = handles_by_label_accuracy.values(), labels = h
 # set titles
 axes["loss"].set_title("Learning Curve")
 axes["accuracy"].set_title("Accuracy")
-
-##################################################
-
-
-# PLOT PERCENTILES PER EPOCH
-##################################################
-
-# plot percentiles per epoch (final 5 epochs)
-n_epochs = min(5, len(pd.unique(percentiles_history["epoch"])), len(colors)) # get the minimum value so there is no error
-colors = colors[:n_epochs] # subet colors to the number of epochs
-percentiles_history = percentiles_history[percentiles_history["epoch"] > (max(percentiles_history["epoch"]) - n_epochs)] # get 5 or less most recent epochs
-epochs = sorted(pd.unique(percentiles_history["epoch"])) # get the epoch numbers that will be displayed in the plot
-for i, epoch in enumerate(epochs):
-    percentile_at_epoch = percentiles_history[percentiles_history["epoch"] == epoch]
-    axes["percentiles_history"].plot(percentile_at_epoch["percentile"], percentile_at_epoch["value"], color = colors[i], linestyle = "solid", label = epoch)
-
-# set x-axis label
-axes["percentiles_history"].set_xlabel("Percentile")
-
-# set y-axis label
-axes["percentiles_history"].set_ylabel("Error")
-
-# set legend
-axes["percentiles_history"].legend(title = "Epoch", loc = "upper left")
-
-# add gridlines
-axes["percentiles_history"].grid()
-
-# set title
-axes["percentiles_history"].set_title("Validation Data Percentiles")
 
 ##################################################
 

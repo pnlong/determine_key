@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=train_key_nn       ## job name
+#SBATCH --job-name=train_key_quality_nn ## job name
 #SBATCH -A tdlong_lab_gpu               ## account to charge
 #SBATCH -p gpu                          ## run on the gpu partition
 #SBATCH --nodes=1                       ## run on a single node
@@ -12,15 +12,12 @@ echo "JOB ID: ${SLURM_JOBID}"
 # README
 # Phillip Long
 # August 11, 2023
-# script to train the neural network on the cluster; request GPU partition
+# script to train the key quality neural network on the cluster; request GPU partition
 # assumes I have already run key_dataset.py
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
-output_prefix="${data}/key_nn.pretrained"
-
-# command to replace filepaths in data file
-# sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/key_data.tsv" > "${data}/key_data.cluster.tsv"
+output_prefix="${data}/key_quality_nn"
 
 # set number of epochs and freeze_pretrained
 epochs="default"
@@ -45,7 +42,7 @@ eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
 conda activate artificial_dj
 
 # run python training script
-python "${artificial_dj}/determine_key/key_neural_network.py" "${data}/key_data.cluster.tsv" "${output_prefix}.pth" "${freeze_pretrained}" "${epochs}"
+python "${artificial_dj}/determine_key/key_quality_neural_network.py" "${data}/key_data.cluster.tsv" "${output_prefix}.pth" "${freeze_pretrained}" "${epochs}"
 
 # create plots
-python "${artificial_dj}/determine_key/training_plots.py" "${output_prefix}.history.tsv" "${output_prefix}.percentiles_history.tsv" "${output_prefix}.png"
+python "${artificial_dj}/determine_key/training_plots_quality.py" "${output_prefix}.history.tsv" "${output_prefix}.png"

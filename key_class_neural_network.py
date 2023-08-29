@@ -159,10 +159,6 @@ if __name__ == "__main__":
 
     # STARTING BEST ACCURACY, ADJUST IF NEEDED
     best_accuracy = 0.0 # make sure to adjust for different accuracy metrics
-    def compute_error(predictions, labels): # calculate closest distance at each prediction to actual note (for instance, a B is both 1 and 11 semitones away from C, pick the smaller (1 semitone))
-        error = torch.abs(input = predictions.view(-1) - labels.view(-1))
-        error = torch.tensor(data = list(map(lambda difference: min(difference, len(KEY_CLASS_MAPPINGS) - difference), error)), dtype = labels.dtype).view(-1) # previously lambda difference: len(KEY_CLASS_MAPPINGS) - difference if difference > len(KEY_CLASS_MAPPINGS) // 2 else difference
-        return error
 
     # history of losses and accuracy
     history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy", "freeze_pretrained")
@@ -274,8 +270,10 @@ if __name__ == "__main__":
                 # compute the total accuracy for the batch and add it to history_epoch["validate_accuracy"]
                 history_epoch["validate_accuracy"] += torch.sum(input = accuracy_batch).item()
 
-                # add accuracy to running count of all the errors in the validation dataset
-                error_validate = torch.cat(tensors = (error_validate, compute_error(predictions = predictions, labels = labels).to(device)), dim = 0)
+                # add accuracy to running count of all the errors in the validation dataset; calculate closest distance at each prediction to actual note (for instance, a B is both 1 and 11 semitones away from C, pick the smaller (1 semitone))
+                error_batch = torch.abs(input = predictions.view(-1) - labels.view(-1)) # compute absolute error, flattening dataset
+                error_batch = torch.tensor(data = list(map(lambda difference: min(difference, len(KEY_CLASS_MAPPINGS) - difference), error_batch)), dtype = error_validate.dtype).view(-1).to(device) # previously lambda difference: len(KEY_CLASS_MAPPINGS) - difference if difference > len(KEY_CLASS_MAPPINGS) // 2 else difference
+                error_validate = torch.cat(tensors = (error_validate, error_batch), dim = 0) # append to error_validate
 
         ##################################################
 
@@ -323,20 +321,22 @@ if __name__ == "__main__":
 
     # helper function for training 
     def train_epochs(start, n): # start = epoch to start training on; n = number of epochs to train from there
+        
+        # print what section is being trained
+        if FREEZE_PRETRAINED:
+            print("Training final regression layer...")
+        elif not FREEZE_PRETRAINED:
+            print("Fine-tuning pretrained layers...")
+        else:
+            print("Training all layers...")
+
+        # epochs loop
         epochs_to_train = range(start, start + n)
         for epoch in epochs_to_train:
             print("----------------------------------------------------------------")
             print(f"EPOCH {epoch + 1} / {epochs_to_train.stop}")
             train_an_epoch(epoch = epoch)
         print("================================================================")
-
-    # print what section is being trained
-    if FREEZE_PRETRAINED:
-        print("Training final regression layer...")
-    elif not FREEZE_PRETRAINED:
-        print("Fine-tuning pretrained layers...")
-    else:
-        print("Training all layers...")
     
     # train epochs
     train_epochs(start = start_epoch, n = EPOCHS)
