@@ -24,7 +24,7 @@ import matplotlib.patches as mpatches
 
 # make arguments
 OUTPUT_FILEPATH_HISTORY = sys.argv[1]
-OUTPUT_FILEPATH = sys.argv[3]
+OUTPUT_FILEPATH = sys.argv[2]
 
 # load in tsv files that have been generated
 history = pd.read_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")

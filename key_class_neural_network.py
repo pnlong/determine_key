@@ -201,7 +201,7 @@ if __name__ == "__main__":
         for inputs, labels in tqdm(data_loader["train"], desc = "Training"):
 
             # register inputs and labels with device
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device), labels.view(-1).to(device)
             
             # clear existing gradients
             optimizer.zero_grad()
@@ -223,11 +223,9 @@ if __name__ == "__main__":
             
             # compute the accuracy
             predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1)
-            labels = labels.view(-1)
-            accuracy_batch = (predictions == labels)
 
             # compute the total accuracy for the batch and add it to history_epoch["train_accuracy"]
-            history_epoch["train_accuracy"] += torch.sum(input = accuracy_batch).item()
+            history_epoch["train_accuracy"] += torch.sum(input = (predictions == labels)).item()
         
         # for calculating time statistics
         end_time_epoch = time()
@@ -247,11 +245,11 @@ if __name__ == "__main__":
             key_class_nn.eval()
 
             # validation loop
-            error_validate = torch.tensor(data = [], dtype = torch.float32).to(device)
+            error_validate = torch.tensor(data = [], dtype = torch.uint8).to(device)
             for inputs, labels in tqdm(data_loader["validate"], desc = "Validating"):
 
                 # register inputs and labels with device
-                inputs, labels = inputs.to(device), labels.to(device)
+                inputs, labels = inputs.to(device), labels.view(-1).to(device)
 
                 # forward pass: compute predictions on input data using the model
                 predictions = key_class_nn(inputs)
@@ -264,11 +262,9 @@ if __name__ == "__main__":
             
                 # compute the accuracy
                 predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1)
-                labels = labels.view(-1)
-                accuracy_batch = (predictions == labels)
 
                 # compute the total accuracy for the batch and add it to history_epoch["validate_accuracy"]
-                history_epoch["validate_accuracy"] += torch.sum(input = accuracy_batch).item()
+                history_epoch["validate_accuracy"] += torch.sum(input = (predictions == labels)).item()
 
                 # add accuracy to running count of all the errors in the validation dataset; calculate closest distance at each prediction to actual note (for instance, a B is both 1 and 11 semitones away from C, pick the smaller (1 semitone))
                 error_batch = torch.abs(input = predictions.view(-1) - labels.view(-1)) # compute absolute error, flattening dataset

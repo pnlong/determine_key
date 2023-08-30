@@ -14,7 +14,7 @@
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
-output_prefix="${data}/key_nn"
+output_suffix="" # set to .whatever (e.g. ".pretrained")
 
 # module load conda (hpc3 help says not to load python + conda together)
 module load miniconda3/4.12.0
@@ -24,4 +24,4 @@ eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
 conda activate artificial_dj
 
 # run python script
-python "${artificial_dj}/determine_key/key_inferences.py" "${data}/key_data.cluster.tsv" "${output_prefix}.pth"
+python "${artificial_dj}/determine_key/key_inferences.py" "${data}/key_data.cluster.tsv" "${data}/key_class_nn${output_suffix}.pth" "${data}/key_quality_nn${output_suffix}.pth"

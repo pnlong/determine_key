@@ -30,6 +30,7 @@ from key_dataset import key_quality_dataset # import dataset class
 ##################################################
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
+CONFIDENCE_THRESHOLD = 0.5 # threshold to declare 1 or 0
 # freeze pretrained parameters (true = freeze pretrained, false = unfreeze pretrained)
 try:
     if sys.argv[3].lower().startswith("f"):
@@ -158,7 +159,6 @@ if __name__ == "__main__":
 
     # STARTING BEST ACCURACY, ADJUST IF NEEDED
     best_accuracy = 0.0 # make sure to adjust for different accuracy metrics
-    confidence_threshold = 0.5 # threshold to declare 1 or 0
 
     # history of losses and accuracy
     history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy", "freeze_pretrained")
@@ -213,12 +213,10 @@ if __name__ == "__main__":
             history_epoch["train_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
             # compute the accuracy
-            predictions = (predictions >= confidence_threshold).view(-1) # convert into booleans
-            labels = labels.view(-1).bool() # convert into booleans
-            accuracy_batch = (predictions == labels)
+            predictions = (predictions >= CONFIDENCE_THRESHOLD) # convert into booleans
 
             # compute the total accuracy for the batch and add it to history_epoch["train_accuracy"]
-            history_epoch["train_accuracy"] += torch.sum(input = accuracy_batch).item()
+            history_epoch["train_accuracy"] += torch.sum(input = (predictions.view(-1) == labels.view(-1))).item()
         
         # for calculating time statistics
         end_time_epoch = time()
@@ -253,12 +251,10 @@ if __name__ == "__main__":
                 history_epoch["validate_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
                 # compute the accuracy
-                predictions = (predictions >= confidence_threshold).view(-1) # convert into booleans
-                labels = labels.view(-1).bool() # convert into booleans
-                accuracy_batch = (predictions == labels)
+                predictions = (predictions >= CONFIDENCE_THRESHOLD) # convert into booleans
 
                 # compute the total accuracy for the batch and add it to history_epoch["validate_accuracy"]
-                history_epoch["validate_accuracy"] += torch.sum(input = accuracy_batch).item()
+                history_epoch["validate_accuracy"] += torch.sum(input = (predictions.view(-1) == labels.view(-1))).item()
 
         ##################################################
 

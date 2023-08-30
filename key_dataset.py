@@ -123,7 +123,7 @@ class key_dataset(Dataset):
         signal = self.mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 128, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
 
         # perform local min-max normalization such that the pixel values span from 0 to 255 (inclusive)
-        signal = (signal - torch.min(signal, dim = None).item()) * (255 / (torch.max(signal).item() - torch.min(signal).item()))
+        signal = (signal - torch.min(signal).item()) * (255 / (torch.max(signal).item() - torch.min(signal).item()))
 
         # make image height satisfy PyTorch image processing requirements, (1, 128, 431) -> (1, 256, 431)
         signal = torch.repeat_interleave(input = signal, repeats = IMAGE_HEIGHT // N_MELS, dim = 1)
@@ -152,23 +152,23 @@ class key_dataset(Dataset):
 # key class (return one of 12 relative keys)
 class key_class_dataset(key_dataset):
 
-    def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
-        super().__init__(labels_filepath, set_type, device, target_sample_rate, sample_duration, use_pseudo_replicates)
+    def __init__(self, labels_filepath, set_type, device):
+        super().__init__(labels_filepath, set_type, device)
 
     def __getitem__(self, index):
         # returns the transformed signal and the actual key class value
-        return super()._get_signal(index = index), torch.tensor([self.data.at[index, "key_class"]], dtype = torch.uint8)
+        return super()._get_signal(index = index), torch.tensor([self.data.at[index, "key_class"]], dtype = torch.int64)
 
 
 # key quality (return Maj or min)
 class key_quality_dataset(key_dataset):
 
-    def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
-        super().__init__(labels_filepath, set_type, device, target_sample_rate, sample_duration, use_pseudo_replicates)
+    def __init__(self, labels_filepath, set_type, device):
+        super().__init__(labels_filepath, set_type, device)
 
     def __getitem__(self, index):
         # returns the transformed signal and the actual key quality value
-        return super()._get_signal(index = index), torch.tensor([self.data.at[index, "key_quality"]], dtype = torch.bool) # 0 for Major, 1 for minor
+        return super()._get_signal(index = index), torch.tensor([self.data.at[index, "key_quality"]], dtype = torch.float32) # 0 for Major, 1 for minor
 
 ##################################################
 
