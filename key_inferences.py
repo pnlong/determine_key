@@ -79,7 +79,7 @@ with torch.no_grad():
         "quality": torch.zeros(len(KEY_QUALITY_MAPPINGS), len(KEY_QUALITY_MAPPINGS), dtype = torch.float32).to(device)
     }
     error = torch.tensor(data = [], dtype = torch.float32).to(device)
-    for (inputs_class, labels_class), (inputs_quality, labels_quality), (_, labels) in tqdm(zip(data_loader["class"], data_loader["quality"], data_loader["key"]), desc = "Making predictions"):
+    for (inputs_class, labels_class), (inputs_quality, labels_quality), (_, labels) in tqdm(zip(data_loader["class"], data_loader["quality"], data_loader["key"]), desc = "Making predictions", total = (len(data["key"]) // BATCH_SIZE) + 1): # https://stackoverflow.com/questions/41171191/tqdm-progressbar-and-zip-built-in-do-not-work-together#:~:text=tqdm%20can%20be%20used%20with,provided%20in%20the%20tqdm%20call.&text=The%20issue%20is%20that%20tqdm,single%20length%20of%20its%20arguments.
 
         # register inputs and labels with device
         inputs_class, labels_class, inputs_quality, labels_quality, labels = inputs_class.to(device), labels_class.view(-1).to(device), inputs_quality.to(device), labels_quality.view(-1).to(device), labels.view(-1).to(device)
