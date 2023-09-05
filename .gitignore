@@ -1,3 +1,5 @@
 .DS_Store
 librosa_test.py
 tensorflow_test.py
+plots/.DS_Store
+
