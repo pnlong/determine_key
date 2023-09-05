@@ -136,6 +136,20 @@ sbatch ./gunzip_key_data.sh
 
 ---
 
+### *determine_key.py*
+
+Given a song (**.mp3**), output its predicted key.
+
+```
+python ./determine_key.py key_class_nn_filepath key_quality_nn_filepath song_filepath
+```
+
+- `key_class_nn_filepath` is the absolute filepath to the **.pth** file for the key class neural network trained in `key_class_neural_network.py`.
+- `key_quality_nn_filepath` is the absolute filepath to the **.pth** file for the key quality neural network trained in `key_quality_neural_network.py`.
+- `song_filepath` is the absolute filepath to the song (**.mp3**) whose key will be predicted.
+
+---
+
 
 ## Results
 

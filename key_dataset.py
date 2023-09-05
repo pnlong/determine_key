@@ -111,13 +111,13 @@ class key_dataset(Dataset):
     def _transform(self, signal, sample_rate):
 
         # resample; sample_rate was already set in preprocessing
-        signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = SAMPLE_RATE, device = self.device) # resample for consistent sample rate
+        # signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = SAMPLE_RATE, device = self.device) # resample for consistent sample rate
         
         # convert from stereo to mono; already done in preprocessing
-        signal = _mix_down_if_necessary(signal = signal)
+        # signal = _mix_down_if_necessary(signal = signal)
 
         # pad/crop for fixed signal duration; duration was already set in preprocessing
-        signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = SAMPLE_DURATION) # crop/pad if signal is too long/short
+        # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = SAMPLE_DURATION) # crop/pad if signal is too long/short
 
         # convert waveform to melspectrogram
         signal = self.mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 128, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
