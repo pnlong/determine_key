@@ -1,0 +1,21 @@
+----------------------------------------------------------------
+Device: CPU
+Imported neural network parameters.
+Making predictions: 100%|██████████| 225/225 [1:02:07<00:00, 16.57s/it]
+----------------------------------------------------------------
+Determining Key Accuracy: 5.18%
+Key Quality Accuracy: 71.28%
+Key Class Accuracy: 71.78%
+Average Error: 0.62
+Minimum Error: 0.00
+5% Percentile: 0.00
+10% Percentile: 0.00
+25% Percentile: 0.00
+50% Percentile: 0.00
+75% Percentile: 1.00
+90% Percentile: 2.00
+95% Percentile: 4.00
+Maximum Error: 6.00
+----------------------------------------------------------------
+Outputting plot...
+Plot saved to /dfs7/adl/pnlong/artificial_dj/data/key_class_nn.test.png.

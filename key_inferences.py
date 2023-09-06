@@ -11,6 +11,7 @@
 # IMPORTS
 ##################################################
 import sys
+from os.path import dirname, join
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
@@ -31,7 +32,9 @@ NN_FILEPATH = {
     "class": sys.argv[2],
     "quality": sys.argv[3]
 }
-OUTPUT_PREFIX = ".".join(NN_FILEPATH["class"].split(".")[:-1])
+OUTPUT_PREFIX = ".".join(NN_FILEPATH["class"].split(".")[:-1]).split(".")
+OUTPUT_PREFIX[0] = join(dirname(OUTPUT_PREFIX[0]), "key_nn")
+OUTPUT_PREFIX = ".".join(OUTPUT_PREFIX)
 OUTPUT_FILEPATH = OUTPUT_PREFIX + ".test.png"
 INCLUDE_CONFUSION_MATRIX = False # whether or not to calculate and display a confusion matrix
 ##################################################

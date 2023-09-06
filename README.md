@@ -153,3 +153,82 @@ python ./determine_key.py key_class_nn_filepath key_quality_nn_filepath song_fil
 
 ## Results
 
+See the raw training and testing results in `train_key_{class, quality}.out` and `test.out`.
+
+
+
+
+
+
+
+I first attempted to create my own neural network from scratch. Note that one of my "convolutional blocks" consists of a convolutional layer followed by a ReLU activation function and max-pooling. My network had the following layout:
+
+- convolutional block 1
+- convolutional block 2
+- convolutional block 3
+- convolutional block 4
+- flattening layer
+- linear layer 1 (100 output features)
+- linear layer 2 (10 output features)
+- output layer (single-feature output, predicted BPM)
+
+This network performed poorly. On both training and validation sets, predicted tempos had an average error of roughly 18 BPM; this was inadequate for my standards. Because the training and validation sets had similar errors, I could tell that my network was suffering from neither high variance nor bias. Combined with the fact that its learning curve had essentially flattened-out after two out of 10 epochs of training, I diagnosed my original network's problem as poor network architecture.
+
+To clarify, my ultimate goal is to train a network that predicts tempo with an average error of less than 5 BPM, and with 95% of predictions having an error of less than 10 BPM.
+
+My next attempt involved using `torchvision`'s pretrained networks, specifically *ResNet50*. Upon loading *ResNet50*'s default weights, I replaced the final classification block with a single-feature-output regression block. The architecture of my regression block looked like this:
+
+- linear layer 1 (1000 output features)
+- linear layer 2 (single-feature output)
+
+My method of training involved freezing all of the pretrained *ResNet50* weights while I trained my regression block, followed up by a fine-tuning of the pretrained weights for the same amount of epochs while I froze my regression block. I repeated this back-and-forth process three times, training six epochs each on the first pass, four each on the second pass, and finally two each on the third pass. To my surprise, this model actually performed slightly worse than my custom one, with an average error on both the training and validation sets of about 20 BPM. It was then that I realized that I had forgot a crucial detail in my final regression block: activation functions! Note that a linear block consists of a linear layer followed by a ReLU activation function. I reworked the architecture of my regression block so that it looked like this:
+
+- linear block 1 (1000-feature output)
+- linear block 2 (500-feature output)
+- linear block 3 (100-feature output)
+- output layer (single-feature output, the tempo in BPM)
+
+Ultimately, however, this didn't change much. I had begun tracking various statistics at this point, and they showed that my model was performing quite poorly (see below).
+
+![Single-Feature Output with ResNet50](./plots/tempo_nn.pretrained.png)
+
+Per my dad's recommendation, I began to target the quality of my input data rather than my network architecture. I did this by applying an autocorrelation function (ACF) to each Mel in my input melspectrograms, thinking this would better capture the periodic nature of music (the tempo). The plot below probably explains it better, but it shows the melspectrogram of a metronome playing at 120 BPM, and then the ACF on the right; the ACF shows a period of ~0.52 seconds, which when converted back into BPM turns out to 115.4 BPM. My hope was that this image would make it easier for my convolutional neural network to pick up on the tempo.
+
+![Audio Preprocessing Metronome](./plots/metronome_preprocessing.png)
+
+However, metronomes are as simple as they come, so below is a more complex example of a kick drum pattern at 100 BPM.
+
+![Audio Preprocessing Kick](./plots/kick_preprocessing.png)
+
+At the same time, after a meeting with my lab advisor, he pointed out that deep learning models tend to perform better on classification tasks as opposed to regression ones. Instead of outputting a single value, he suggested I should have my model classify any given song to a "tempo range". I implemented this by changing my output to 86 probabilities that map to "tempo ranges"; each "tempo range" represents an integer tempo in the range (85 BPM, 170 BPM]. For example, if applying an argmax function to my model's 86-feature output yielded an index of 0, then the input song has a predicted tempo in the range [85, 86) BPM; if this process outputted an index of 85, the song has a predicted tempo of [170, 171) BPM. In an ideal world, if my model was able to predict tempos with 100% accuracy, even though there is a loss in quality due to my use of *tempo ranges* as opposed to *exact tempos*, the model would only have a maximum error of 0.5 BPM; in the grand scheme of things, a difference in tempo of 0.5 BPM would go largely unnoticed by the average music listener. My new network architecture remained quite similar to my original modification of *ResNet50*, with the only change being the output layer. Note that I do not end my model with a softmax layer (my outputs are logits, which improves the performance of the Cross Entropy loss function). On another note, my lab advisor also discouraged my back-and-forth process of fine-tuning the pretrained model, and rather, I should either just train the regression block or fine-tune the entire model altogether. I chose to do the former, as the latter sounded computationally expensive. The new architecture of the regression block was this:
+
+- linear block 1 (1000-feature output)
+- linear block 2 (500-feature output)
+- linear block 3 (100-feature output)
+- output layer (86-feature output, each representing a "tempo range")
+
+Unfortunately, these changes did not improve my model all that much. The median error in tempo prediction had shrunk from 20 BPM to 15 BPM, which was a positive improvement, albeit far from my goal.
+
+![Classification Output with ResNet50](./plots/tempo_nn.classification.png)
+
+At this point, I realized that my code had a somewhat major bug: when I would resume training from the most recent epoch, the loss function would reset. I later learned that this was due to an error in loading that optimizer's `state_dict`, but more importantly, somewhere along in my debugging process, I returned to using my custom network architecture instead of *ResNet50*. To my surprise, it performed a lot better! I think this was due to the fact that I was training the whole model as opposed to just the final regression layer (as was the case with *ResNet50*), and I imagine if I trained all of *ResNet50* on my data, I would achieve similar results. However, my new (or one could say old) model architure now looked like this:
+
+- convolutional block 1
+- convolutional block 2
+- convolutional block 3
+- convolutional block 4
+- flattening layer
+- linear block 1 (1000-feature output)
+- linear block 2 (500-feature output)
+- linear block 3 (100-feature output)
+- output layer (86-feature output, each representing a tempo "range")
+
+I trained this network on 10 epochs. The median error in tempo predictions was now 0 BPM, and 95% of tempo predictions had an error <10 BPM.
+
+![Classification Output with Custom Model](./plots/tempo_nn.png)
+
+I was very happy with this result. I also suspect that a portion of the 5% of tempo predictions with errors >10 BPM stem from mislabelled data. Testing on data not used in training yields the following percentiles plot, which shows that the model performs with similar metrics on data it has never seen.
+
+![Test Dataset](./plots/tempo_nn.test.png)
+
+With this result, I concluded my project of using machine learning to determine the tempo of a song.

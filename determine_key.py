@@ -156,6 +156,6 @@ if __name__ == "__main__":
     nn_filepath = {"class": sys.argv[1], "quality": sys.argv[2]}
     key_determiner = key_determiner(nn_filepath = nn_filepath)
     predicted_key = key_determiner.determine_key(song_filepath = song_filepath)
-    print(f"The predicted key of {song_filepath} is {predicted_key}.")
+    print(f"Predicted key of {song_filepath}: {predicted_key}or")
 
 ##################################################
