@@ -1,6 +1,6 @@
 KEY CLASS
 JOB ID: 23963708
-EPOCHS: default
+EPOCHS: 10
 FREEZE_PRETRAINED: True
 ----------------------------------------------------------------
 Device: CUDA

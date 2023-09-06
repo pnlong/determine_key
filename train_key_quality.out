@@ -1,6 +1,6 @@
 KEY QUALITY
 JOB ID: 23976632
-EPOCHS: default
+EPOCHS: 10
 FREEZE_PRETRAINED: True
 ----------------------------------------------------------------
 Device: CUDA
