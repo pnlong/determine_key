@@ -1,0 +1,122 @@
+KEY QUALITY
+JOB ID: 23976632
+EPOCHS: default
+FREEZE_PRETRAINED: True
+----------------------------------------------------------------
+Device: CUDA
+Device Name: Tesla V100-FHHL-16GB
+Memory Usage:
+  - Allocated: 0.4 GB
+  - Cached: 0.5 GB
+================================================================
+Summary of Neural Network:
+----------------------------------------------------------------
+        Layer (type)               Output Shape         Param #
+================================================================
+            Conv2d-1         [-1, 16, 258, 864]             448
+              ReLU-2         [-1, 16, 258, 864]               0
+         MaxPool2d-3         [-1, 16, 129, 432]               0
+            Conv2d-4         [-1, 32, 131, 434]           4,640
+              ReLU-5         [-1, 32, 131, 434]               0
+         MaxPool2d-6          [-1, 32, 65, 217]               0
+            Conv2d-7          [-1, 64, 67, 219]          18,496
+              ReLU-8          [-1, 64, 67, 219]               0
+         MaxPool2d-9          [-1, 64, 33, 109]               0
+           Conv2d-10         [-1, 128, 35, 111]          73,856
+             ReLU-11         [-1, 128, 35, 111]               0
+        MaxPool2d-12          [-1, 128, 17, 55]               0
+          Flatten-13               [-1, 119680]               0
+           Linear-14                 [-1, 1000]     119,681,000
+             ReLU-15                 [-1, 1000]               0
+           Linear-16                  [-1, 500]         500,500
+             ReLU-17                  [-1, 500]               0
+           Linear-18                  [-1, 100]          50,100
+             ReLU-19                  [-1, 100]               0
+           Linear-20                    [-1, 1]             101
+          Sigmoid-21                    [-1, 1]               0
+================================================================
+Total params: 120,329,141
+Trainable params: 120,329,141
+Non-trainable params: 0
+----------------------------------------------------------------
+Input size (MB): 2.53
+Forward/backward pass size (MB): 117.95
+Params size (MB): 459.02
+Estimated Total Size (MB): 579.50
+----------------------------------------------------------------
+================================================================
+Training final regression layer...
+----------------------------------------------------------------
+EPOCH 1 / 10
+Training: 100%|██████████| 1570/1570 [1:57:50<00:00,  4.50s/it]
+Validating: 100%|██████████| 449/449 [32:38<00:00,  4.36s/it]
+Training Time: 117.8 minutes
+Training Loss: 0.683, Validation Loss: 0.680
+Training Accuracy: 54.853%, Validation Accuracy: 55.394%
+----------------------------------------------------------------
+EPOCH 2 / 10
+Training: 100%|██████████| 1570/1570 [1:21:03<00:00,  3.10s/it]
+Validating: 100%|██████████| 449/449 [22:45<00:00,  3.04s/it]
+Training Time: 81.1 minutes
+Training Loss: 0.669, Validation Loss: 0.669
+Training Accuracy: 58.049%, Validation Accuracy: 58.822%
+----------------------------------------------------------------
+EPOCH 3 / 10
+Training: 100%|██████████| 1570/1570 [1:21:09<00:00,  3.10s/it]
+Validating: 100%|██████████| 449/449 [23:14<00:00,  3.11s/it]
+Training Time: 81.2 minutes
+Training Loss: 0.641, Validation Loss: 0.648
+Training Accuracy: 62.264%, Validation Accuracy: 60.669%
+----------------------------------------------------------------
+EPOCH 4 / 10
+Training: 100%|██████████| 1570/1570 [1:20:02<00:00,  3.06s/it]
+Validating: 100%|██████████| 449/449 [21:04<00:00,  2.82s/it]
+Training Time: 80.0 minutes
+Training Loss: 0.582, Validation Loss: 0.639
+Training Accuracy: 68.068%, Validation Accuracy: 62.780%
+----------------------------------------------------------------
+EPOCH 5 / 10
+Training: 100%|██████████| 1570/1570 [1:14:32<00:00,  2.85s/it]
+Validating: 100%|██████████| 449/449 [20:36<00:00,  2.75s/it]
+Training Time: 74.5 minutes
+Training Loss: 0.485, Validation Loss: 0.637
+Training Accuracy: 75.574%, Validation Accuracy: 67.066%
+----------------------------------------------------------------
+EPOCH 6 / 10
+Training: 100%|██████████| 1570/1570 [1:13:49<00:00,  2.82s/it]
+Validating: 100%|██████████| 449/449 [20:54<00:00,  2.79s/it]
+Training Time: 73.8 minutes
+Training Loss: 0.348, Validation Loss: 0.720
+Training Accuracy: 84.237%, Validation Accuracy: 67.568%
+----------------------------------------------------------------
+EPOCH 7 / 10
+Training: 100%|██████████| 1570/1570 [1:15:46<00:00,  2.90s/it]
+Validating: 100%|██████████| 449/449 [21:06<00:00,  2.82s/it]
+Training Time: 75.8 minutes
+Training Loss: 0.217, Validation Loss: 0.752
+Training Accuracy: 91.321%, Validation Accuracy: 68.815%
+----------------------------------------------------------------
+EPOCH 8 / 10
+Training: 100%|██████████| 1570/1570 [1:14:56<00:00,  2.86s/it]
+Validating: 100%|██████████| 449/449 [20:38<00:00,  2.76s/it]
+Training Time: 74.9 minutes
+Training Loss: 0.134, Validation Loss: 1.015
+Training Accuracy: 94.895%, Validation Accuracy: 70.913%
+----------------------------------------------------------------
+EPOCH 9 / 10
+Training: 100%|██████████| 1570/1570 [1:16:52<00:00,  2.94s/it]
+Validating: 100%|██████████| 449/449 [22:06<00:00,  2.95s/it]
+Training Time: 76.9 minutes
+Training Loss: 0.087, Validation Loss: 1.049
+Training Accuracy: 96.910%, Validation Accuracy: 71.645%
+----------------------------------------------------------------
+EPOCH 10 / 10
+Training: 100%|██████████| 1570/1570 [1:16:29<00:00,  2.92s/it]
+Validating: 100%|██████████| 449/449 [27:13<00:00,  3.64s/it]
+Training Time: 76.5 minutes
+Training Loss: 0.065, Validation Loss: 1.035
+Training Accuracy: 97.758%, Validation Accuracy: 70.871%
+================================================================
+Training is done.
+Time Elapsed: 17 hours and 25.1 minutes
+Training plot saved to /dfs7/adl/pnlong/artificial_dj/data/key_quality_nn.png.
