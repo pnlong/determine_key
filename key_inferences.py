@@ -162,8 +162,8 @@ if INCLUDE_CONFUSION_MATRIX:
 
 # print accuracies
 print(f"Determining Key Accuracy: {accuracy['key']:.2f}%")
-print(f"Key Quality Accuracy: {accuracy['quality']:.2f}%")
 print(f"Key Class Accuracy: {accuracy['class']:.2f}%")
+print(f"Key Quality Accuracy: {accuracy['quality']:.2f}%")
 
 # print results
 print(f"Average Error: {torch.mean(input = error).item():.2f}")
