@@ -20,9 +20,9 @@ I can use two approaches for collecting data:
 
 For either data approach, I would split the data 70%-20%-10% into training, cross-validation, and test datasets, respectively.
 
-I will use Fourier transforms to convert raw-audio-waveform into melspectrogram data, which I will then use to train my neural networks. Raw audio waveforms represent amplitude (not a pitch-based value) as a function of time, and are thus hard to use for determining key; melspectrograms, on the other hand, display what is effectively pitch as a function of time. [Melspectrograms are better than normal spectrograms](https://medium.com/analytics-vidhya/understanding-the-mel-spectrogram-fca2afa2ce53) because the mel scale better represents the human perception of pitch than the frequency scale, and thus, musical notes and chords are more apparent. Below is an example of what a melspectrogram that I feed my neural network could look like.
+I will use Fourier transforms to convert raw-audio-waveform into melspectrogram data, which I will then use to train my neural networks. Raw audio waveforms represent amplitude (not a pitch-based value) as a function of time, and are thus hard to use for determining key; melspectrograms, on the other hand, display what is effectively pitch as a function of time. [Melspectrograms are better than normal spectrograms](https://medium.com/analytics-vidhya/understanding-the-mel-spectrogram-fca2afa2ce53) because the mel scale better represents the human perception of pitch than the frequency scale, and thus, musical notes and chords are more apparent. Below is an example of what a melspectrogram that I feed my neural network could look like (this particular example shows a metronome click).
 
-![Audio Preprocessing Melspectrogram](https://miro.medium.com/v2/resize:fit:1200/1*Fro3rNxKeNq4L1pqx7o41Q.png)
+![Audio Preprocessing Melspectrogram](./plots/metronome_preprocessing.png)
 
 I ended up employing an approach similar to the one I used in my [determine_tempo project](https://github.com/pnlong/determine_tempo). For each song in my 2000-song personal music library, I split each song into a bunch of 20-second-long "clips" spaced five seconds apart. This meant that for each song, I had around 30 "clips". Ultimately, I trained my neural network(s) on 71,750 samples of audio.
 
